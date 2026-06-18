@@ -1,0 +1,27 @@
+{
+  "page": {
+    "finishedWidthMm": 92.0,
+    "finishedHeightMm": 56.0,
+    "bleedMm": 3.0
+  },
+  "colors": {
+    "deepBlue": "#23496b",
+    "wiseGrey": "#cedbea",
+    "black": "#1e1e1e",
+    "white": "#ffffff"
+  },
+  "front": {
+    "logo": { "x": 7.0, "y": 6.0, "w": 26.0, "h": 8.5 },
+    "companyTop": { "x": 47.0, "y": 11.5, "fontSize": 7.0 },
+    "name": { "x": 9.0, "y": 24.0, "fontSize": 12.0, "minFontSize": 8.5 },
+    "title": { "x": 9.0, "y": 30.0, "fontSize": 5.8, "minFontSize": 4.8 },
+    "companyLine": { "x": 9.0, "y": 36.0, "fontSize": 5.8 },
+    "infoLabels": { "x": 47.0, "y": 31.0, "fontSize": 5.4 },
+    "infoValues": { "x": 58.0, "y": 31.0, "fontSize": 5.4 },
+    "watermark": { "x": 4.0, "y": 38.0, "w": 84.0, "h": 15.0, "opacity": 0.35 }
+  },
+  "back": {
+    "qr": { "x": 32.0, "y": 11.5, "size": 28.0 },
+    "caption": { "x": 0.0, "y": 43.0, "fontSize": 7.0, "align": "center" }
+  }
+}
