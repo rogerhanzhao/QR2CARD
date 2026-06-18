@@ -1,5 +1,7 @@
 # QR2CARD - CALB Business Card Generator
 
+[![Android APK Build](https://github.com/rogerhanzhao/QR2CARD/actions/workflows/android-apk.yml/badge.svg)](https://github.com/rogerhanzhao/QR2CARD/actions/workflows/android-apk.yml)
+
 Native Android app for generating CALB-standard business cards locally on device. The app follows the PDF prompt in this folder and uses the supplied CALB card template as the visual reference.
 
 ## What it does
