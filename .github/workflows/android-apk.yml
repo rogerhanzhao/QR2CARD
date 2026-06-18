@@ -52,7 +52,28 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace
+        shell: bash
+        run: |
+          set +e
+          ./gradlew :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee build-debug.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            tail -n 80 build-debug.log > build-debug-tail.log
+            message=$(sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e ':a;N;$!ba;s/\n/%0A/g' build-debug-tail.log)
+            echo "::error title=Gradle assembleDebug failed::$message"
+          fi
+          exit "$status"
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: QR2CARD-build-log
+          path: |
+            build-debug.log
+            build-debug-tail.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
