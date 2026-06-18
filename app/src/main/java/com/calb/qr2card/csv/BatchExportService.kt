@@ -45,7 +45,7 @@ class BatchExportService(
                 val folder = "CALB_Business_Cards/$safeName/"
                 val personDir = File(exportRoot, safeName).apply { mkdirs() }
 
-                val preview = pdfRendererService.generatePreviewPdf(context, row.data, config, personDir)
+                val preview = pdfRendererService.generatePreviewImage(context, row.data, config, personDir)
                 val print = pdfRendererService.generatePrintPdf(context, row.data, config, personDir)
                 zip.addFile(folder + preview.name, preview)
                 zip.addFile(folder + print.name, print)

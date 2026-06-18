@@ -29,16 +29,11 @@ class PhoneNormalizer(
             if (!isValid) {
                 PhoneNormalizationResult(false, error = "Mobile number is invalid for $region.")
             } else {
-                val display = phoneUtil
-                    .format(parsed, PhoneNumberUtil.PhoneNumberFormat.INTERNATIONAL)
-                    .replace('\u00A0', ' ')
-                    .replace('-', ' ')
-                    .replace(Regex("\\s+"), " ")
-                    .trim() + " ($region)"
+                val e164 = phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164)
                 PhoneNormalizationResult(
                     isValid = true,
-                    display = display,
-                    e164 = phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164),
+                    display = "$e164 ($region)",
+                    e164 = e164,
                 )
             }
         } catch (error: NumberParseException) {

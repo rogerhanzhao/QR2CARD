@@ -9,8 +9,9 @@ Native Android app for generating CALB-standard business cards locally on device
 - Single-card form for employee information.
 - US/CN/international phone normalization with E.164 vCard output.
 - Static vCard 3.0 QR generation with CRLF line endings.
-- Two-page preview PDF at 92 mm x 56 mm.
-- Two-page print PDF at 98 mm x 62 mm with 3 mm bleed and crop marks.
+- Preview PNG containing only the front and back card artwork, with text and layout fixed as pixels.
+- Four-page print PDF at 98 mm x 62 mm with 3 mm bleed, crop marks, and downloadable print-ready card pages.
+- Print PDF pages 1-2 are the front/back card artwork. Pages 3-4 are Chinese print-detail notes for paper, dimensions, bleed, colors, QR, fonts, and delivery use.
 - CSV batch import, validation report, and ZIP export for valid rows.
 - Local-only processing. No backend, account, analytics, or personal-data upload.
 
@@ -44,8 +45,8 @@ CLI build, after installing JDK 17 and Android SDK:
 2. Enter or edit employee data.
 3. Tap `Validate`.
 4. Review the front/back preview.
-5. Generate preview PDF or print-ready PDF.
-6. Use `Share Last Export` to send the file through the Android share sheet.
+5. Use `Preview PNG - Share...` or `Print PDF - Share...` to open the Android share sheet and send the file through installed messaging, email, or social apps.
+6. Use `Preview PNG - Save to...` or `Print PDF - Save to...` to choose a visible local/cloud destination with the Android system file picker.
 
 ## Batch CSV
 
@@ -55,15 +56,20 @@ Use `samples/batch_cards.csv` as the import format:
 EnglishName,FirstName,LastName,Title,CompanyLine,MobileCountry,MobileNumber,Email,Website,Street,City,State,Postcode,Country,Note
 ```
 
-The app validates each row. Valid rows can be exported into a ZIP containing preview PDF, print PDF, VCF, QR PNG, and `batch_validation_report.csv`.
+The app validates each row. Valid rows can be exported into a ZIP containing preview PNG, print PDF, VCF, QR PNG, and `batch_validation_report.csv`.
 
 ## Phone Normalization
 
-Phone numbers are parsed with Google's libphonenumber. Display values may contain spaces and a country label, for example `+1 401 592 7928 (US)`. vCard `TEL` values always use E.164, for example `+14015927928`.
+Phone numbers are parsed with Google's libphonenumber. Display values use E.164 plus a country label, for example `+14015927928 (US)`. vCard `TEL` values always use E.164, for example `+14015927928`.
 
 ## Assets
 
 The app uses `app/src/main/res/drawable/calb_logo.png`, copied from the provided CALB logo image. Replace that file to update the logo. Keep the replacement high resolution and transparent if possible.
+
+Bundled PDF/card fonts live in `app/src/main/assets/fonts/`:
+
+- `Manrope-Regular.otf` and `Manrope-Bold.otf` for English card text.
+- `HarmonyOS_Sans_SC_Regular.ttf` for Chinese print-detail notes.
 
 ## Template JSON
 
@@ -72,5 +78,5 @@ Template coordinates live in `app/src/main/assets/template_config.json`. Coordin
 ## Known Limitations
 
 - The PDF renderer uses Android `PdfDocument`, so page dimensions are rounded to whole PDF points.
-- Font embedding is not implemented; Android system sans-serif is used consistently.
+- PDF text uses bundled project font files instead of Android system sans-serif to keep output typography consistent across devices.
 - Advanced template editing is file-based in V1 rather than a full visual editor.

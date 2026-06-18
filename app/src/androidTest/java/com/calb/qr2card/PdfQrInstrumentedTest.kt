@@ -25,9 +25,9 @@ class PdfQrInstrumentedTest {
     }
 
     @Test
-    fun createsPreviewPdfFile() {
+    fun createsPreviewPngFile() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val file = PdfRendererService().generatePreviewPdf(
+        val file = PdfRendererService().generatePreviewImage(
             context = context,
             data = EmployeeCardData(),
             config = TemplateConfig(),
@@ -35,5 +35,6 @@ class PdfQrInstrumentedTest {
 
         assertTrue(file.exists())
         assertTrue(file.length() > 0)
+        assertTrue(file.name.endsWith("_Preview.png"))
     }
 }

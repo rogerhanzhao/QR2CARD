@@ -1,8 +1,15 @@
 package com.calb.qr2card.ui
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
+import android.graphics.Typeface
+import android.graphics.Color as AndroidColor
+import androidx.compose.foundation.Canvas
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -43,10 +50,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -57,16 +63,21 @@ import com.calb.qr2card.csv.BatchExportService
 import com.calb.qr2card.csv.BatchValidationRow
 import com.calb.qr2card.csv.CsvBatchService
 import com.calb.qr2card.data.EmployeeCardData
+import com.calb.qr2card.data.TemplateConfig
+import com.calb.qr2card.data.displayCardAddressLines
 import com.calb.qr2card.data.defaultCompanyLines
-import com.calb.qr2card.data.displayAddress
 import com.calb.qr2card.domain.VCardService
 import com.calb.qr2card.pdf.PdfRendererService
 import com.calb.qr2card.qr.QrCodeService
+import com.calb.qr2card.util.BrandFonts
+import com.calb.qr2card.util.decodeSampledBitmapResource
 import com.calb.qr2card.util.ShareUtils
 import java.util.Locale
 
 private val DeepBlue = Color(0xFF23496B)
 private val WiseGrey = Color(0xFFCEDBEA)
+private const val CardWidthMm = 92f
+private const val CardHeightMm = 56f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,34 +117,37 @@ fun QR2CardApp(viewModel: CardViewModel) {
             }
 
             when (state.screen) {
-                AppScreen.Home -> HomeScreen(viewModel::navigate)
+                AppScreen.Home -> HomeScreen(viewModel::navigate, state.templateConfig)
                 AppScreen.Single -> SingleCardScreen(
                     state = state,
                     viewModel = viewModel,
                     onGeneratePreview = {
-                        viewModel.validateForExport()?.let { data ->
-                            val file = pdfRendererService.generatePreviewPdf(context, data, state.templateConfig)
+                        val data = viewModel.validateForExport()
+                        if (data != null) {
+                            val file = pdfRendererService.generatePreviewImage(context, data, state.templateConfig)
                             viewModel.setLastExport(file)
+                            file
+                        } else {
+                            null
                         }
                     },
                     onGeneratePrint = {
-                        viewModel.validateForExport()?.let { data ->
+                        val data = viewModel.validateForExport()
+                        if (data != null) {
                             val file = pdfRendererService.generatePrintPdf(context, data, state.templateConfig)
                             viewModel.setLastExport(file)
+                            file
+                        } else {
+                            null
                         }
                     },
                     onShare = {
                         state.lastExport?.let { file ->
-                            val mime = if (file.extension.equals("zip", ignoreCase = true)) {
-                                "application/zip"
-                            } else {
-                                "application/pdf"
-                            }
-                            ShareUtils.shareFile(context, file, mime)
+                            ShareUtils.shareFile(context, file, exportMimeType(file))
                         } ?: viewModel.setStatus("Generate a file before sharing.")
                     },
                 )
-                AppScreen.Preview -> PreviewScreen(state.cardData)
+                AppScreen.Preview -> PreviewScreen(state.cardData, state.templateConfig)
                 AppScreen.Batch -> BatchScreen(state, viewModel)
                 AppScreen.Settings -> SettingsScreen(state, viewModel)
                 AppScreen.About -> AboutScreen()
@@ -151,15 +165,22 @@ private fun screenTitle(screen: AppScreen): String = when (screen) {
     AppScreen.About -> "About"
 }
 
+private fun exportMimeType(file: java.io.File): String = when (file.extension.lowercase(Locale.US)) {
+    "png" -> "image/png"
+    "pdf" -> "application/pdf"
+    "zip" -> "application/zip"
+    else -> "application/octet-stream"
+}
+
 @Composable
-private fun HomeScreen(onNavigate: (AppScreen) -> Unit) {
+private fun HomeScreen(onNavigate: (AppScreen) -> Unit, config: TemplateConfig) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        BusinessCardPreview(data = EmployeeCardData(), front = true)
+        BusinessCardPreview(data = EmployeeCardData(), front = true, config = config)
         Button(onClick = { onNavigate(AppScreen.Single) }, modifier = Modifier.fillMaxWidth()) {
             Text("Create Single Card")
         }
@@ -179,11 +200,55 @@ private fun HomeScreen(onNavigate: (AppScreen) -> Unit) {
 private fun SingleCardScreen(
     state: CardUiState,
     viewModel: CardViewModel,
-    onGeneratePreview: () -> Unit,
-    onGeneratePrint: () -> Unit,
+    onGeneratePreview: () -> java.io.File?,
+    onGeneratePrint: () -> java.io.File?,
     onShare: () -> Unit,
 ) {
     val data = state.cardData
+    val context = LocalContext.current
+    var pendingSaveFile by remember { mutableStateOf<java.io.File?>(null) }
+
+    fun finishSave(uri: android.net.Uri?) {
+        val file = pendingSaveFile
+        pendingSaveFile = null
+        if (uri == null) {
+            viewModel.setStatus("Save cancelled.")
+            return
+        }
+        if (file == null) {
+            viewModel.setStatus("No generated file is available to save.")
+            return
+        }
+        runCatching {
+            ShareUtils.saveFileToUri(context, file, uri)
+        }.onSuccess {
+            viewModel.setStatus("Saved to selected location: ${file.name}")
+        }.onFailure { error ->
+            viewModel.setStatus("Save failed: ${error.message}")
+        }
+    }
+    val savePdfLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/pdf"),
+    ) { uri -> finishSave(uri) }
+    val savePngLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("image/png"),
+    ) { uri -> finishSave(uri) }
+
+    fun shareExport(file: java.io.File?) {
+        file?.let { ShareUtils.shareFile(context, it, exportMimeType(it)) }
+    }
+
+    fun saveExport(file: java.io.File?) {
+        file?.let {
+            pendingSaveFile = it
+            if (it.extension.equals("png", ignoreCase = true)) {
+                savePngLauncher.launch(it.name)
+            } else {
+                savePdfLauncher.launch(it.name)
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -233,23 +298,29 @@ private fun SingleCardScreen(
         OutlinedButton(onClick = { viewModel.navigate(AppScreen.Preview) }, modifier = Modifier.fillMaxWidth()) {
             Text("Preview Front / Back")
         }
-        Button(onClick = onGeneratePreview, modifier = Modifier.fillMaxWidth()) {
-            Text("Generate Preview PDF")
+        Button(onClick = { shareExport(onGeneratePreview()) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Preview PNG - Share...")
         }
-        Button(onClick = onGeneratePrint, modifier = Modifier.fillMaxWidth()) {
-            Text("Generate Print PDF")
+        OutlinedButton(onClick = { saveExport(onGeneratePreview()) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Preview PNG - Save to...")
         }
-        OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth()) {
-            Text("Share Last Export")
+        Button(onClick = { shareExport(onGeneratePrint()) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Print PDF - Share...")
+        }
+        OutlinedButton(onClick = { saveExport(onGeneratePrint()) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Print PDF - Save to...")
         }
         state.lastExport?.let { file ->
-            Text("Last file: ${file.absolutePath}", style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth()) {
+                Text("Share Last Export Again")
+            }
+            Text("Last generated: ${file.name}", style = MaterialTheme.typography.bodySmall)
         }
     }
 }
 
 @Composable
-private fun PreviewScreen(data: EmployeeCardData) {
+private fun PreviewScreen(data: EmployeeCardData, config: TemplateConfig) {
     var showVCard by remember { mutableStateOf(false) }
     val vCard = remember(data) { VCardService().buildVCard(data) }
     Column(
@@ -259,8 +330,8 @@ private fun PreviewScreen(data: EmployeeCardData) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        BusinessCardPreview(data = data, front = true)
-        BusinessCardPreview(data = data, front = false)
+        BusinessCardPreview(data = data, front = true, config = config)
+        BusinessCardPreview(data = data, front = false, config = config)
         OutlinedButton(onClick = { showVCard = !showVCard }, modifier = Modifier.fillMaxWidth()) {
             Text(if (showVCard) "Hide vCard Text" else "Show vCard Text")
         }
@@ -379,8 +450,9 @@ private fun SettingsScreen(state: CardUiState, viewModel: CardViewModel) {
         Text("QR color: black. Deep Blue can be added later, but black is safer for print scanning.")
         HorizontalDivider()
         Text("Export Options", fontWeight = FontWeight.Bold)
-        Text("Preview PDF: 92 mm x 56 mm")
-        Text("Print PDF: 98 mm x 62 mm with 3 mm bleed")
+        Text("Preview PNG: one image containing front and back card artwork")
+        Text("Print PDF: 4 pages, 98 mm x 62 mm with 3 mm bleed and crop marks")
+        Text("Pages 3-4 contain Chinese print-detail notes.")
         Text("Template version: V1 JSON")
     }
 }
@@ -401,84 +473,366 @@ private fun AboutScreen() {
 }
 
 @Composable
-private fun BusinessCardPreview(data: EmployeeCardData, front: Boolean) {
-    Box(
+private fun BusinessCardPreview(data: EmployeeCardData, front: Boolean, config: TemplateConfig) {
+    val context = LocalContext.current
+    val logoBitmap = remember {
+        decodeSampledBitmapResource(context.resources, R.drawable.calb_logo, 1200, 400)
+    }
+    val watermarkBitmap = remember {
+        decodeSampledBitmapResource(context.resources, R.drawable.calb_watermark_outline, 1800, 1100)
+    }
+    val qrBitmap = remember(data) {
+        val vCard = VCardService().buildVCard(data)
+        QrCodeService().generateQrBitmap(vCard, 1024, backgroundColor = AndroidColor.TRANSPARENT)
+    }
+
+    Canvas(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(92f / 56f)
+            .aspectRatio(CardWidthMm / CardHeightMm)
             .clip(RoundedCornerShape(4.dp))
             .background(Color.White)
-            .border(1.dp, WiseGrey, RoundedCornerShape(4.dp))
-            .padding(18.dp),
+            .border(1.dp, WiseGrey, RoundedCornerShape(4.dp)),
     ) {
-        if (front) {
-            Text(
-                "CALB",
-                modifier = Modifier.align(Alignment.BottomCenter),
-                color = WiseGrey.copy(alpha = 0.55f),
-                fontSize = 58.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.sp,
-            )
-            Image(
-                painter = painterResource(R.drawable.calb_logo),
-                contentDescription = "CALB logo",
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .width(120.dp),
-                contentScale = ContentScale.Fit,
-            )
-            Text(
-                "CALB Group Co., Ltd.",
-                modifier = Modifier.align(Alignment.TopEnd),
-                color = DeepBlue,
-                fontSize = 13.sp,
-                letterSpacing = 1.sp,
-            )
-            Column(
-                modifier = Modifier.align(Alignment.CenterStart),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(data.englishName, color = DeepBlue, fontSize = 21.sp, fontWeight = FontWeight.Medium)
-                Text(data.title, color = DeepBlue, fontSize = 10.sp)
-                Text(data.companyLine, color = DeepBlue, fontSize = 10.sp)
-            }
-            Column(
-                modifier = Modifier.align(Alignment.CenterEnd),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                PreviewInfoRow("Mobile", data.mobileDisplay)
-                PreviewInfoRow("Mail", data.email)
-                PreviewInfoRow("Postcode", data.postcode)
-                PreviewInfoRow("Address", data.displayAddress())
-            }
-        } else {
-            val qrImage = remember(data) {
-                val vCard = VCardService().buildVCard(data)
-                QrCodeService().generateQrBitmap(vCard, 512).asImageBitmap()
-            }
-            Column(
-                modifier = Modifier.align(Alignment.Center),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Image(
-                    bitmap = qrImage,
-                    contentDescription = "vCard QR",
-                    modifier = Modifier.size(132.dp),
+        drawIntoCanvas { canvas ->
+            val nativeCanvas = canvas.nativeCanvas
+            if (front) {
+                drawBusinessCardFront(
+                    nativeCanvas,
+                    context,
+                    size.width,
+                    size.height,
+                    data,
+                    config,
+                    logoBitmap,
+                    watermarkBitmap,
                 )
-                Spacer(Modifier.height(8.dp))
-                Text("Scan and Save Contact", color = Color(0xFF222222), fontSize = 14.sp)
+            } else {
+                drawBusinessCardBack(nativeCanvas, context, size.width, size.height, data, config, qrBitmap)
             }
         }
     }
 }
 
-@Composable
-private fun PreviewInfoRow(label: String, value: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, color = DeepBlue, fontSize = 9.sp, modifier = Modifier.width(44.dp))
-        Text(value, color = DeepBlue, fontSize = 9.sp, modifier = Modifier.width(130.dp))
+private fun drawBusinessCardFront(
+    canvas: android.graphics.Canvas,
+    context: Context,
+    widthPx: Float,
+    heightPx: Float,
+    data: EmployeeCardData,
+    config: TemplateConfig,
+    logoBitmap: Bitmap?,
+    watermarkBitmap: Bitmap?,
+) {
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    val blue = AndroidColor.rgb(35, 73, 107)
+    val regularTypeface = BrandFonts.manropeRegular(context)
+    val boldTypeface = BrandFonts.manropeBold(context)
+    fun x(mm: Float) = widthPx * mm / CardWidthMm
+    fun y(mm: Float) = heightPx * mm / CardHeightMm
+    fun pt(value: Float) = value * heightPx / (CardHeightMm * 72f / 25.4f)
+
+    drawPreviewPaperBackground(canvas, widthPx, heightPx)
+
+    logoBitmap?.let { logo ->
+        val box = config.front.logo
+        drawBitmapFit(
+            canvas = canvas,
+            bitmap = logo,
+            target = RectF(x(box.x), y(box.y), x(box.x + box.w), y(box.y + box.h)),
+        )
     }
+
+    watermarkBitmap?.let { watermark ->
+        val box = config.front.watermark
+        drawBitmapStretch(
+            canvas = canvas,
+            bitmap = watermark,
+            target = RectF(x(box.x), y(box.y), x(box.x + box.w), y(box.y + box.h)),
+        )
+    }
+
+    paint.color = blue
+    paint.style = Paint.Style.FILL
+    paint.strokeWidth = 0f
+    paint.typeface = regularTypeface
+    paint.textAlign = Paint.Align.LEFT
+
+    val front = config.front
+    drawTrackedCanvasText(
+        canvas,
+        paint,
+        "CALB Group Co., Ltd.",
+        x(front.companyTop.x),
+        y(front.companyTop.y),
+        pt(front.companyTop.fontSize),
+        x(42f),
+        x(0.14f),
+        typeface = regularTypeface,
+    )
+    drawFittedCanvasText(
+        canvas = canvas,
+        paint = paint,
+        text = data.englishName,
+        x = x(front.name.x),
+        baseline = y(front.name.y),
+        fontPx = pt(front.name.fontSize),
+        maxWidthPx = x(34f),
+        typeface = boldTypeface,
+        minFontPx = pt(front.name.minFontSize),
+    )
+    drawWrappedCanvasText(
+        canvas,
+        paint,
+        data.title,
+        x(front.title.x),
+        y(front.title.y),
+        pt(front.title.fontSize),
+        x(38f),
+        2,
+        y(3.1f),
+        typeface = regularTypeface,
+    )
+    drawFittedCanvasText(
+        canvas,
+        paint,
+        data.companyLine,
+        x(front.companyLine.x),
+        y(front.companyLine.y),
+        pt(front.companyLine.fontSize),
+        x(36f),
+        typeface = regularTypeface,
+    )
+
+    val labels = listOf("Mobile", "Mail", "Postcode", "Address")
+    val values = listOf(
+        listOf(data.mobileDisplay),
+        listOf(data.email),
+        listOf(data.postcode),
+        data.displayCardAddressLines(),
+    )
+    val rowGap = 3.75f
+    labels.forEachIndexed { index, label ->
+        val baseline = y(front.infoLabels.y + index * rowGap)
+        drawFittedCanvasText(
+            canvas,
+            paint,
+            label,
+            x(front.infoLabels.x),
+            baseline,
+            pt(front.infoLabels.fontSize),
+            x(10.2f),
+            typeface = regularTypeface,
+        )
+        values[index].forEachIndexed { lineIndex, value ->
+            drawFittedCanvasText(
+                canvas,
+                paint,
+                value,
+                x(front.infoValues.x),
+                baseline + y(rowGap * lineIndex),
+                pt(front.infoValues.fontSize),
+                x(31.2f),
+                minFontPx = pt(4.4f),
+                typeface = regularTypeface,
+            )
+        }
+    }
+}
+
+private fun drawBusinessCardBack(
+    canvas: android.graphics.Canvas,
+    context: Context,
+    widthPx: Float,
+    heightPx: Float,
+    data: EmployeeCardData,
+    config: TemplateConfig,
+    qrBitmap: Bitmap,
+) {
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    val regularTypeface = BrandFonts.manropeRegular(context)
+    fun x(mm: Float) = widthPx * mm / CardWidthMm
+    fun y(mm: Float) = heightPx * mm / CardHeightMm
+    fun pt(value: Float) = value * heightPx / (CardHeightMm * 72f / 25.4f)
+
+    drawPreviewPaperBackground(canvas, widthPx, heightPx)
+    drawBitmapFit(
+        canvas = canvas,
+        bitmap = qrBitmap,
+        target = RectF(
+            x(config.back.qr.x),
+            y(config.back.qr.y),
+            x(config.back.qr.x + config.back.qr.size),
+            y(config.back.qr.y + config.back.qr.size),
+        ),
+    )
+    paint.color = AndroidColor.rgb(34, 34, 34)
+    paint.style = Paint.Style.FILL
+    paint.textAlign = Paint.Align.CENTER
+    paint.typeface = regularTypeface
+    paint.textSize = pt(config.back.caption.fontSize)
+    canvas.drawText("Scan and Save Contact", widthPx / 2f, y(config.back.caption.y), paint)
+}
+
+private fun drawBitmapFit(
+    canvas: android.graphics.Canvas,
+    bitmap: Bitmap,
+    target: RectF,
+) {
+    val sourceRatio = bitmap.width.toFloat() / bitmap.height.toFloat()
+    val targetRatio = target.width() / target.height()
+    val fitted = RectF(target)
+    if (sourceRatio > targetRatio) {
+        val fittedHeight = target.width() / sourceRatio
+        fitted.top = target.top + (target.height() - fittedHeight) / 2f
+        fitted.bottom = fitted.top + fittedHeight
+    } else {
+        val fittedWidth = target.height() * sourceRatio
+        fitted.left = target.left + (target.width() - fittedWidth) / 2f
+        fitted.right = fitted.left + fittedWidth
+    }
+    canvas.drawBitmap(bitmap, Rect(0, 0, bitmap.width, bitmap.height), fitted, null)
+}
+
+private fun drawBitmapStretch(
+    canvas: android.graphics.Canvas,
+    bitmap: Bitmap,
+    target: RectF,
+) {
+    canvas.drawBitmap(bitmap, Rect(0, 0, bitmap.width, bitmap.height), target, null)
+}
+
+private fun drawPreviewPaperBackground(
+    canvas: android.graphics.Canvas,
+    widthPx: Float,
+    heightPx: Float,
+) {
+    canvas.drawColor(AndroidColor.WHITE)
+    val speckPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.rgb(206, 219, 234)
+        alpha = 6
+        strokeWidth = 0.45f
+    }
+    var row = 0
+    var y = heightPx * 2.2f / CardHeightMm
+    while (y < heightPx) {
+        var px = widthPx * (if (row % 2 == 0) 1.4f else 4.8f) / CardWidthMm
+        while (px < widthPx) {
+            canvas.drawPoint(px, y, speckPaint)
+            px += widthPx * 8.6f / CardWidthMm
+        }
+        row += 1
+        y += heightPx * 5.8f / CardHeightMm
+    }
+}
+
+private fun drawFittedCanvasText(
+    canvas: android.graphics.Canvas,
+    paint: Paint,
+    text: String,
+    x: Float,
+    baseline: Float,
+    fontPx: Float,
+    maxWidthPx: Float,
+    minFontPx: Float = fontPx * 0.78f,
+    typeface: Typeface = Typeface.DEFAULT,
+) {
+    paint.style = Paint.Style.FILL
+    paint.strokeWidth = 0f
+    paint.textAlign = Paint.Align.LEFT
+    paint.typeface = typeface
+    paint.textSize = fontPx
+    while (paint.measureText(text) > maxWidthPx && paint.textSize > minFontPx) {
+        paint.textSize -= 0.5f
+    }
+    canvas.drawText(text, x, baseline, paint)
+}
+
+private fun drawTrackedCanvasText(
+    canvas: android.graphics.Canvas,
+    paint: Paint,
+    text: String,
+    x: Float,
+    baseline: Float,
+    fontPx: Float,
+    maxWidthPx: Float,
+    trackingPx: Float,
+    minFontPx: Float = fontPx * 0.78f,
+    typeface: Typeface = Typeface.DEFAULT,
+) {
+    paint.style = Paint.Style.FILL
+    paint.strokeWidth = 0f
+    paint.textAlign = Paint.Align.LEFT
+    paint.typeface = typeface
+    paint.textSize = fontPx
+    while (measureTrackedCanvasText(paint, text, trackingPx) > maxWidthPx && paint.textSize > minFontPx) {
+        paint.textSize -= 0.5f
+    }
+    var cursor = x
+    text.forEach { char ->
+        val value = char.toString()
+        canvas.drawText(value, cursor, baseline, paint)
+        cursor += paint.measureText(value) + trackingPx
+    }
+}
+
+private fun measureTrackedCanvasText(paint: Paint, text: String, trackingPx: Float): Float {
+    if (text.isEmpty()) return 0f
+    var width = 0f
+    text.forEach { char -> width += paint.measureText(char.toString()) }
+    return width + trackingPx * (text.length - 1)
+}
+
+private fun drawWrappedCanvasText(
+    canvas: android.graphics.Canvas,
+    paint: Paint,
+    text: String,
+    x: Float,
+    firstBaseline: Float,
+    fontPx: Float,
+    maxWidthPx: Float,
+    maxLines: Int,
+    lineGapPx: Float,
+    typeface: Typeface = Typeface.DEFAULT,
+) {
+    paint.style = Paint.Style.FILL
+    paint.strokeWidth = 0f
+    paint.textAlign = Paint.Align.LEFT
+    paint.typeface = typeface
+    paint.textSize = fontPx
+    val lines = wrapCanvasText(paint, text, maxWidthPx, maxLines)
+    lines.forEachIndexed { index, line ->
+        canvas.drawText(line, x, firstBaseline + index * lineGapPx, paint)
+    }
+}
+
+private fun wrapCanvasText(
+    paint: Paint,
+    text: String,
+    maxWidthPx: Float,
+    maxLines: Int,
+): List<String> {
+    val words = text.split(Regex("\\s+")).filter { it.isNotBlank() }
+    val lines = mutableListOf<String>()
+    var current = ""
+    words.forEach { word ->
+        val candidate = if (current.isBlank()) word else "$current $word"
+        if (paint.measureText(candidate) <= maxWidthPx || current.isBlank()) {
+            current = candidate
+        } else {
+            lines += current
+            current = word
+        }
+    }
+    if (current.isNotBlank()) lines += current
+    if (lines.size <= maxLines) return lines
+    val clipped = lines.take(maxLines).toMutableList()
+    var last = clipped.last()
+    while (paint.measureText("$last...") > maxWidthPx && last.length > 3) {
+        last = last.dropLast(1)
+    }
+    clipped[clipped.lastIndex] = "$last..."
+    return clipped
 }
 
 @Composable

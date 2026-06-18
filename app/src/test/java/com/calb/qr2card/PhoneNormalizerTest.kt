@@ -15,7 +15,7 @@ class PhoneNormalizerTest {
 
         assertTrue(result.isValid)
         assertEquals("+14015927928", result.e164)
-        assertEquals("+1 401 592 7928 (US)", result.display)
+        assertEquals("+14015927928 (US)", result.display)
     }
 
     @Test
@@ -24,7 +24,7 @@ class PhoneNormalizerTest {
 
         assertTrue(result.isValid)
         assertEquals("+8613800138000", result.e164)
-        assertEquals("+86 138 0013 8000 (CN)", result.display)
+        assertEquals("+8613800138000 (CN)", result.display)
     }
 
     @Test
