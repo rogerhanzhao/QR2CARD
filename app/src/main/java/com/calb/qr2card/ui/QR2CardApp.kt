@@ -501,8 +501,8 @@ private fun ValidationPanel(state: CardUiState) {
 private fun Field(
     label: String,
     value: String,
-    onValueChange: (String) -> Unit,
     keyboardType: KeyboardType = KeyboardType.Text,
+    onValueChange: (String) -> Unit,
 ) {
     OutlinedTextField(
         value = value,
