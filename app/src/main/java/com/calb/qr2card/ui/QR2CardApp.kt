@@ -22,10 +22,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -227,7 +227,7 @@ private fun SingleCardScreen(
 
         ValidationPanel(state)
 
-        Button(onClick = viewModel::validate, modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = { viewModel.validate() }, modifier = Modifier.fillMaxWidth()) {
             Text("Validate")
         }
         OutlinedButton(onClick = { viewModel.navigate(AppScreen.Preview) }, modifier = Modifier.fillMaxWidth()) {
@@ -363,12 +363,12 @@ private fun SettingsScreen(state: CardUiState, viewModel: CardViewModel) {
             onSelected = { selected -> viewModel.updateCardData { it.copy(companyLine = selected) } },
         )
         Field("Default Website", data.website) { value -> viewModel.updateCardData { it.copy(website = value) } }
-        Divider()
+        HorizontalDivider()
         Text("Address Presets", fontWeight = FontWeight.Bold)
         OutlinedButton(onClick = viewModel::applyBrookshirePreset, modifier = Modifier.fillMaxWidth()) {
             Text("Apply Brookshire Office")
         }
-        Divider()
+        HorizontalDivider()
         Text("QR Options", fontWeight = FontWeight.Bold)
         Text("QR size: ${String.format(Locale.US, "%.1f", state.templateConfig.back.qr.size)} mm")
         Slider(
@@ -377,7 +377,7 @@ private fun SettingsScreen(state: CardUiState, viewModel: CardViewModel) {
             valueRange = 26f..30f,
         )
         Text("QR color: black. Deep Blue can be added later, but black is safer for print scanning.")
-        Divider()
+        HorizontalDivider()
         Text("Export Options", fontWeight = FontWeight.Bold)
         Text("Preview PDF: 92 mm x 56 mm")
         Text("Print PDF: 98 mm x 62 mm with 3 mm bleed")

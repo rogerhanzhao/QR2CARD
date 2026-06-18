@@ -51,9 +51,6 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Run unit tests
-        run: ./gradlew :app:testDebugUnitTest --stacktrace
-
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
 
@@ -64,6 +61,9 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Run unit tests
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
 
       - name: Upload unit test reports
         if: always()
