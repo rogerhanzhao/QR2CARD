@@ -1,8 +1,11 @@
 # QR2CARD - CALB Business Card Generator
 
 [![Android APK Build](https://github.com/rogerhanzhao/QR2CARD/actions/workflows/android-apk.yml/badge.svg)](https://github.com/rogerhanzhao/QR2CARD/actions/workflows/android-apk.yml)
+[![iOS Build](https://github.com/rogerhanzhao/QR2CARD/actions/workflows/ios-build.yml/badge.svg?branch=codex/ios-version)](https://github.com/rogerhanzhao/QR2CARD/actions/workflows/ios-build.yml?query=branch%3Acodex%2Fios-version)
 
 Native Android app for generating CALB-standard business cards locally on device. The app follows the PDF prompt in this folder and uses the supplied CALB card template as the visual reference.
+
+The experimental iOS SwiftUI implementation lives on branch `codex/ios-version` under `ios/`. It is a separate native app, not a compile-only Android target. GitHub Actions builds an iOS Simulator artifact; installable iPhone builds require Apple signing through TestFlight, App Store, Ad Hoc, or Apple Business Manager. See `ios/README.md`.
 
 ## What it does
 
