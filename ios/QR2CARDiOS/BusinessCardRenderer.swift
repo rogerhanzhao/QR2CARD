@@ -211,8 +211,12 @@ final class BusinessCardRenderer {
     }
 
     private func drawContactBlock(_ context: CGContext, data: EmployeeCardData, offsetMm: CGFloat) {
+        var mobileLines = [data.mobileDisplay]
+        if !data.mobile2Display.isEmpty {
+            mobileLines.append(data.mobile2Display)
+        }
         let labels = ["Mobile", "Mail", "Postcode", "Address"]
-        let values = [[data.mobileDisplay], [data.email], [data.postcode], data.cardAddressLines]
+        let values = [mobileLines, [data.email], [data.postcode], data.cardAddressLines]
         let rowGap = CardConstants.mmToPt(3.75)
         var cursorY = y(template.infoLabels.y, offsetMm)
         let blue = UIColor(hex: template.deepBlue)
@@ -230,7 +234,7 @@ final class BusinessCardRenderer {
                     fontFactory: brandFont
                 )
             }
-            cursorY += index == labels.indices.last ? rowGap * CGFloat(values[index].count) : rowGap
+            cursorY += rowGap * CGFloat(values[index].count)
         }
     }
 
