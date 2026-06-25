@@ -5,7 +5,8 @@ import com.calb.qr2card.data.EmployeeCardData
 class VCardService {
     fun buildVCard(data: EmployeeCardData): String {
         val phone = data.mobileE164.ifBlank { data.mobileRawInput }
-        val lines = listOf(
+        val phone2 = data.mobile2E164.ifBlank { data.mobile2RawInput }
+        val lines = listOfNotNull(
             "BEGIN:VCARD",
             "VERSION:3.0",
             "N:${escape(data.lastName)};${escape(data.firstName)};;;",
@@ -13,6 +14,7 @@ class VCardService {
             "ORG:${escape(data.companyLine)}",
             "TITLE:${escape(data.title)}",
             "TEL;TYPE=CELL,WORK,VOICE:$phone",
+            if (phone2.isNotBlank()) "TEL;TYPE=CELL,WORK,VOICE:$phone2" else null,
             "EMAIL;TYPE=INTERNET,WORK:${escape(data.email)}",
             "ADR;TYPE=WORK:;;${escape(data.street)};${escape(data.city)};${escape(data.state)};${escape(data.postcode)};${escape(data.country)}",
             "URL;TYPE=WORK:${escape(data.website)}",

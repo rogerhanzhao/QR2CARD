@@ -29,11 +29,11 @@ data class TemplateConfig(
         val logo: BoxMm = BoxMm(8.3f, 7.35f, 22.7f, 7.1f),
         val companyTop: TextMm = TextMm(46.8f, 11.5f, 9.2f),
         val name: TextMm = TextMm(9.0f, 24.2f, 12.6f, 8.5f),
-        val title: TextMm = TextMm(9.0f, 27.7f, 6.3f, 4.8f),
-        val companyLine: TextMm = TextMm(9.0f, 31.5f, 6.3f),
+        val title: TextMm = TextMm(9.0f, 29.95f, 6.3f, 4.8f),
+        val companyLine: TextMm = TextMm(9.0f, 33.7f, 6.3f),
         val infoLabels: TextMm = TextMm(46.9f, 29.95f, 6.1f),
         val infoValues: TextMm = TextMm(57.4f, 29.95f, 6.1f),
-        val watermark: WatermarkMm = WatermarkMm(0.0f, 0.0f, 92.0f, 56.0f, 1.0f),
+        val watermark: WatermarkMm = WatermarkMm(-3.1f, -0.6f, 98.0f, 59.6f, 1.0f),
     )
 
     @Serializable

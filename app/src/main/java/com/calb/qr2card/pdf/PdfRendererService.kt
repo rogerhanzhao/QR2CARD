@@ -343,7 +343,11 @@ class PdfRendererService(
             labelColor = Color.WHITE,
             label = "DEEP BLUE",
             chinese = "深邃蓝",
-            details = listOf("PMS:7700C；CMYK:92/75/46/8", "RGB:35/73/107；HEX:#23496B"),
+            details = listOf(
+                "PMS:7700C；CMYK:92/75/46/8",
+                "RGB:35/73/107；HEX:#23496B",
+                "用途：Logo、姓名、职位与全部文字信息。",
+            ),
             config = config,
             labelTypeface = boldTypeface,
             chineseTypeface = chineseTypeface,
@@ -357,7 +361,11 @@ class PdfRendererService(
             labelColor = deepBlue,
             label = "WISE GREY",
             chinese = "智慧灰",
-            details = listOf("PMS:642C；CMYK:23/11/5/0", "RGB:206/219/234；HEX:#CEDBEA"),
+            details = listOf(
+                "PMS:642C；CMYK:23/11/5/0",
+                "RGB:206/219/234；HEX:#CEDBEA",
+                "用途：正面 CALB 空心水印与珠光底纹。",
+            ),
             config = config,
             labelTypeface = boldTypeface,
             chineseTypeface = chineseTypeface,
@@ -373,13 +381,14 @@ class PdfRendererService(
             canvas = canvas,
             paint = notePaint,
             lines = listOf(
-                "QR：黑色输出，保留静区，交付前需实机扫码。",
-                "Preview PNG 用于校对；Print PDF 为可下载印刷版。",
+                "BLACK 黑色：HEX #1E1E1E（CMYK 0/0/0/100）。用途：二维码与说明文字。",
+                "QR 纯黑输出、保留四周静区，交付前需实机扫码确认。",
+                "本 PDF 为矢量文件，文字可在 Adobe Illustrator 中直接编辑。",
             ),
             x = x(7.0f, trimOffsetMm),
-            firstBaseline = y(47.0f, trimOffsetMm),
-            lineGap = PdfMath.mmToPt(4.0f),
-            maxWidth = PdfMath.mmToPt(78.0f),
+            firstBaseline = y(45.5f, trimOffsetMm),
+            lineGap = PdfMath.mmToPt(3.6f),
+            maxWidth = PdfMath.mmToPt(80.0f),
         )
     }
 
@@ -490,9 +499,13 @@ class PdfRendererService(
         trimOffsetMm: Float,
         basePaint: Paint,
     ) {
+        val mobileLines = buildList {
+            add(data.mobileDisplay)
+            if (data.mobile2Display.isNotBlank()) add(data.mobile2Display)
+        }
         val labels = listOf("Mobile", "Mail", "Postcode", "Address")
         val values = listOf(
-            listOf(data.mobileDisplay),
+            mobileLines,
             listOf(data.email),
             listOf(data.postcode),
             data.displayCardAddressLines(),
@@ -516,7 +529,7 @@ class PdfRendererService(
                     maxWidth = PdfMath.mmToPt(31.2f),
                 )
             }
-            cursorY += if (index == labels.lastIndex) rowGap * values[index].size else rowGap
+            cursorY += rowGap * values[index].size
         }
     }
 

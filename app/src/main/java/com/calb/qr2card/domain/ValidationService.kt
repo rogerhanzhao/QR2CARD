@@ -52,6 +52,15 @@ class ValidationService(
             errors += phone.error ?: "Mobile number is invalid."
         }
 
+        // Second mobile is optional: only validate when a number is entered.
+        val phone2 = if (data.mobile2RawInput.isNotBlank()) {
+            phoneNormalizer.normalize(data.mobile2RawInput, data.mobile2CountryIso).also {
+                if (!it.isValid) errors += it.error ?: "Second mobile number is invalid."
+            }
+        } else {
+            null
+        }
+
         if (data.englishName.length > 28) warnings += "Name may be too long for the template."
         if (data.title.length > 44) warnings += "Title may wrap or require smaller text."
         if (data.email.length > 36) warnings += "Email may require smaller text."
@@ -59,7 +68,7 @@ class ValidationService(
             warnings += "Address may exceed two lines."
         }
 
-        val normalizedData = if (phone.isValid) {
+        var normalizedData = if (phone.isValid) {
             data.copy(
                 mobileCountryIso = data.mobileCountryIso.uppercase(),
                 mobileDisplay = phone.display,
@@ -67,6 +76,19 @@ class ValidationService(
             )
         } else {
             data
+        }
+        normalizedData = when {
+            phone2 == null -> normalizedData.copy(
+                mobile2CountryIso = normalizedData.mobile2CountryIso.uppercase(),
+                mobile2Display = "",
+                mobile2E164 = "",
+            )
+            phone2.isValid -> normalizedData.copy(
+                mobile2CountryIso = normalizedData.mobile2CountryIso.uppercase(),
+                mobile2Display = phone2.display,
+                mobile2E164 = phone2.e164,
+            )
+            else -> normalizedData
         }
 
         return ValidationOutcome(

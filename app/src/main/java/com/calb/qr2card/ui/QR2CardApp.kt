@@ -273,6 +273,13 @@ private fun SingleCardScreen(
             keyboardType = KeyboardType.Phone,
             onValueChange = { value -> viewModel.updateCardData { it.copy(mobileRawInput = value) } },
         )
+        Field("Mobile Country 2 (optional)", data.mobile2CountryIso) { value -> viewModel.updateCardData { it.copy(mobile2CountryIso = value.uppercase()) } }
+        Field(
+            label = "Mobile Number 2 (optional, China)",
+            value = data.mobile2RawInput,
+            keyboardType = KeyboardType.Phone,
+            onValueChange = { value -> viewModel.updateCardData { it.copy(mobile2RawInput = value) } },
+        )
         Field(
             label = "Email",
             value = data.email,
@@ -604,16 +611,21 @@ private fun drawBusinessCardFront(
         typeface = regularTypeface,
     )
 
+    val mobileLines = buildList {
+        add(data.mobileDisplay)
+        if (data.mobile2Display.isNotBlank()) add(data.mobile2Display)
+    }
     val labels = listOf("Mobile", "Mail", "Postcode", "Address")
     val values = listOf(
-        listOf(data.mobileDisplay),
+        mobileLines,
         listOf(data.email),
         listOf(data.postcode),
         data.displayCardAddressLines(),
     )
     val rowGap = 3.75f
+    var cursorYmm = front.infoLabels.y
     labels.forEachIndexed { index, label ->
-        val baseline = y(front.infoLabels.y + index * rowGap)
+        val baseline = y(cursorYmm)
         drawFittedCanvasText(
             canvas,
             paint,
@@ -637,6 +649,7 @@ private fun drawBusinessCardFront(
                 typeface = regularTypeface,
             )
         }
+        cursorYmm += rowGap * values[index].size
     }
 }
 
