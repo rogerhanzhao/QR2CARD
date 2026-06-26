@@ -41,7 +41,7 @@ struct ContentView: View {
                 cardTextField("Last Name", text: $data.lastName)
             }
             cardTextField("Title", text: $data.title)
-            cardTextField("Department", text: $data.companyLine)
+            departmentField()
 
             Text("Contact")
                 .font(.headline)
@@ -155,6 +155,25 @@ struct ContentView: View {
             .textFieldStyle(.roundedBorder)
             .textInputAutocapitalization(.never)
             .keyboardType(keyboard)
+    }
+
+    /// Department / company line: free text entry plus a menu of default
+    /// suggestions, so the user can type a custom value or pick a preset.
+    private func departmentField() -> some View {
+        HStack(spacing: 8) {
+            TextField("Department", text: $data.companyLine)
+                .textFieldStyle(.roundedBorder)
+                .textInputAutocapitalization(.never)
+            Menu {
+                ForEach(CardConstants.companyLines, id: \.self) { option in
+                    Button(option) { data.companyLine = option }
+                }
+            } label: {
+                Image(systemName: "chevron.down.circle")
+                    .imageScale(.large)
+                    .accessibilityLabel("Department suggestions")
+            }
+        }
     }
 
     private func validateCurrentData() -> EmployeeCardData? {
