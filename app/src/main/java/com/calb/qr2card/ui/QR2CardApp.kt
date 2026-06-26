@@ -29,11 +29,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -55,7 +57,6 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.calb.qr2card.R
@@ -256,11 +257,11 @@ private fun SingleCardScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SimpleDropdown(
+        EditableDropdown(
             label = "Department",
-            selected = data.companyLine,
+            value = data.companyLine,
             options = defaultCompanyLines,
-            onSelected = { selected -> viewModel.updateCardData { it.copy(companyLine = selected) } },
+            onValueChange = { value -> viewModel.updateCardData { it.copy(companyLine = value) } },
         )
         Field("English Name", data.englishName) { value -> viewModel.updateCardData { it.copy(englishName = value) } }
         Field("First Name", data.firstName) { value -> viewModel.updateCardData { it.copy(firstName = value) } }
@@ -434,11 +435,11 @@ private fun SettingsScreen(state: CardUiState, viewModel: CardViewModel) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text("Default Company Information", fontWeight = FontWeight.Bold)
-        SimpleDropdown(
+        EditableDropdown(
             label = "Default Company Line",
-            selected = data.companyLine,
+            value = data.companyLine,
             options = defaultCompanyLines,
-            onSelected = { selected -> viewModel.updateCardData { it.copy(companyLine = selected) } },
+            onValueChange = { value -> viewModel.updateCardData { it.copy(companyLine = value) } },
         )
         Field("Default Website", data.website) { value -> viewModel.updateCardData { it.copy(website = value) } }
         HorizontalDivider()
@@ -881,30 +882,54 @@ private fun Field(
     )
 }
 
+/**
+ * Editable dropdown: the user can type a custom value freely, while still being
+ * able to pick from [options]. Suggestions are filtered by what has been typed.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SimpleDropdown(
+private fun EditableDropdown(
     label: String,
-    selected: String,
+    value: String,
     options: List<String>,
-    onSelected: (String) -> Unit,
+    onValueChange: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Column {
-        Text(label, style = MaterialTheme.typography.labelLarge)
-        Box {
-            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(selected.ifBlank { "Select" }, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Start)
-            }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                options.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option) },
-                        onClick = {
-                            onSelected(option)
-                            expanded = false
-                        },
-                    )
-                }
+    val suggestions = remember(value, options) {
+        if (value.isBlank()) options
+        else options.filter { it.contains(value, ignoreCase = true) && it != value }
+    }
+    ExposedDropdownMenuBox(
+        expanded = expanded && suggestions.isNotEmpty(),
+        onExpandedChange = { expanded = it },
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {
+                onValueChange(it)
+                expanded = true
+            },
+            label = { Text(label) },
+            singleLine = true,
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded && suggestions.isNotEmpty())
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, enabled = true),
+        )
+        ExposedDropdownMenu(
+            expanded = expanded && suggestions.isNotEmpty(),
+            onDismissRequest = { expanded = false },
+        ) {
+            suggestions.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = {
+                        onValueChange(option)
+                        expanded = false
+                    },
+                )
             }
         }
     }
