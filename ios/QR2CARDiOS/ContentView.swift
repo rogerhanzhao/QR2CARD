@@ -41,7 +41,7 @@ struct ContentView: View {
                 cardTextField("Last Name", text: $data.lastName)
             }
             cardTextField("Title", text: $data.title)
-            cardTextField("Company Line", text: $data.companyLine)
+            cardTextField("Department", text: $data.companyLine)
 
             Text("Contact")
                 .font(.headline)
@@ -71,7 +71,7 @@ struct ContentView: View {
                 cardTextField("Postcode", text: $data.postcode)
                 cardTextField("Country", text: $data.country)
             }
-            cardTextField("Note", text: $data.note)
+            cardTextField("Company Line", text: $data.note)
         }
     }
 

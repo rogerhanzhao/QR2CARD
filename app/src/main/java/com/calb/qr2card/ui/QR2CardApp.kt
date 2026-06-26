@@ -257,7 +257,7 @@ private fun SingleCardScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SimpleDropdown(
-            label = "Company Line",
+            label = "Department",
             selected = data.companyLine,
             options = defaultCompanyLines,
             onSelected = { selected -> viewModel.updateCardData { it.copy(companyLine = selected) } },
@@ -295,7 +295,7 @@ private fun SingleCardScreen(
         Field("State/Province", data.state) { value -> viewModel.updateCardData { it.copy(state = value) } }
         Field("Postcode", data.postcode) { value -> viewModel.updateCardData { it.copy(postcode = value) } }
         Field("Country", data.country) { value -> viewModel.updateCardData { it.copy(country = value) } }
-        Field("Note", data.note) { value -> viewModel.updateCardData { it.copy(note = value) } }
+        Field("Company Line", data.note) { value -> viewModel.updateCardData { it.copy(note = value) } }
 
         ValidationPanel(state)
 
