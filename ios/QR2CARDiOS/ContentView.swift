@@ -41,7 +41,7 @@ struct ContentView: View {
                 cardTextField("Last Name", text: $data.lastName)
             }
             cardTextField("Title", text: $data.title)
-            cardTextField("Company Line", text: $data.companyLine)
+            cardTextField("Department", text: $data.companyLine)
 
             Text("Contact")
                 .font(.headline)
@@ -50,6 +50,11 @@ struct ContentView: View {
                 cardTextField("Country", text: $data.mobileCountryIso)
                     .frame(maxWidth: 120)
                 cardTextField("Mobile", text: $data.mobileRawInput, keyboard: .phonePad)
+            }
+            HStack {
+                cardTextField("Country 2", text: $data.mobile2CountryIso)
+                    .frame(maxWidth: 120)
+                cardTextField("Mobile 2 (optional)", text: $data.mobile2RawInput, keyboard: .phonePad)
             }
             cardTextField("Email", text: $data.email, keyboard: .emailAddress)
             cardTextField("Website", text: $data.website, keyboard: .URL)
@@ -66,7 +71,7 @@ struct ContentView: View {
                 cardTextField("Postcode", text: $data.postcode)
                 cardTextField("Country", text: $data.country)
             }
-            cardTextField("Note", text: $data.note)
+            cardTextField("Company Line", text: $data.note)
         }
     }
 

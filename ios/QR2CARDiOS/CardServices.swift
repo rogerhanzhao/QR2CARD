@@ -38,6 +38,21 @@ enum ValidationService {
             errors.append(phone.error)
         }
 
+        // Second mobile is optional: only validate when a number is entered.
+        data.mobile2CountryIso = data.mobile2CountryIso.uppercased()
+        if data.mobile2RawInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            data.mobile2Display = ""
+            data.mobile2E164 = ""
+        } else {
+            let phone2 = normalizePhone(data.mobile2RawInput, region: data.mobile2CountryIso)
+            if phone2.isValid {
+                data.mobile2Display = "\(phone2.e164) (\(data.mobile2CountryIso))"
+                data.mobile2E164 = phone2.e164
+            } else {
+                errors.append("Second mobile number is invalid for \(data.mobile2CountryIso).")
+            }
+        }
+
         if data.englishName.count > 28 {
             warnings.append("Name may be too long for the template.")
         }
@@ -82,7 +97,8 @@ enum VCardService {
         let address = [data.street, data.city, data.state, data.postcode, data.country]
             .map(escape)
             .joined(separator: ";")
-        let lines = [
+        let secondMobile = data.mobile2E164.isEmpty ? data.mobile2RawInput : data.mobile2E164
+        let lines: [String?] = [
             "BEGIN:VCARD",
             "VERSION:3.0",
             "N:\(escape(data.lastName));\(escape(data.firstName));;;",
@@ -90,13 +106,14 @@ enum VCardService {
             "ORG:\(escape(data.companyLine))",
             "TITLE:\(escape(data.title))",
             "TEL;TYPE=CELL:\(data.mobileE164)",
+            secondMobile.isEmpty ? nil : "TEL;TYPE=CELL:\(secondMobile)",
             "EMAIL:\(escape(data.email))",
             "URL:\(escape(data.website))",
             "ADR;TYPE=WORK:;;\(address)",
             "NOTE:\(escape(data.note))",
             "END:VCARD"
         ]
-        return lines.joined(separator: "\r\n")
+        return lines.compactMap { $0 }.joined(separator: "\r\n")
     }
 
     private static func escape(_ value: String) -> String {
