@@ -6,8 +6,12 @@ build/
 app/build/
 local.properties
 tmp/
+_archive/
 *.iml
 *.apk
 *.aab
 *.keystore
 *.jks
+assets/fonts/
+preview_tool/poppler
+preview_tool/poppler.zip
