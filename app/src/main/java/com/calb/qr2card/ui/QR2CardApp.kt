@@ -437,9 +437,9 @@ private fun SettingsScreen(state: CardUiState, viewModel: CardViewModel) {
         Text("Default Company Information", fontWeight = FontWeight.Bold)
         EditableDropdown(
             label = "Default Company Line",
-            value = data.companyLine,
+            value = data.note,
             options = defaultCompanyLines,
-            onValueChange = { value -> viewModel.updateCardData { it.copy(companyLine = value) } },
+            onValueChange = { value -> viewModel.updateCardData { it.copy(note = value) } },
         )
         Field("Default Website", data.website) { value -> viewModel.updateCardData { it.copy(website = value) } }
         HorizontalDivider()
