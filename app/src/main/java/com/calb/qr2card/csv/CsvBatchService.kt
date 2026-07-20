@@ -85,7 +85,7 @@ class CsvBatchService(
             firstName = value("FirstName"),
             lastName = value("LastName"),
             title = value("Title"),
-            companyLine = value("CompanyLine").ifBlank { "CALB Americas Inc" },
+            companyLine = value("CompanyLine").ifBlank { "CALB Group Co., Ltd." },
             mobileCountryIso = value("MobileCountry").ifBlank { "US" },
             mobileRawInput = value("MobileNumber"),
             email = value("Email"),
@@ -95,7 +95,7 @@ class CsvBatchService(
             state = value("State"),
             postcode = value("Postcode"),
             country = value("Country"),
-            note = value("Note"),
+            department = value("Department").ifBlank { value("Note") },
         )
     }
 

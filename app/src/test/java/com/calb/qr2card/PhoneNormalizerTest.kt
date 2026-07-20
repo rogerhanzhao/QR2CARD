@@ -11,20 +11,20 @@ class PhoneNormalizerTest {
 
     @Test
     fun normalizesUsNumber() {
-        val result = normalizer.normalize("4015927928", "US")
+        val result = normalizer.normalize("2135897421", "US")
 
         assertTrue(result.isValid)
-        assertEquals("+14015927928", result.e164)
-        assertEquals("+14015927928 (US)", result.display)
+        assertEquals("+12135897421", result.e164)
+        assertEquals("+1 (213) 589-7421", result.display)
     }
 
     @Test
     fun normalizesChinaNumber() {
-        val result = normalizer.normalize("13800138000", "CN")
+        val result = normalizer.normalize("13967258941", "CN")
 
         assertTrue(result.isValid)
-        assertEquals("+8613800138000", result.e164)
-        assertEquals("+8613800138000 (CN)", result.display)
+        assertEquals("+8613967258941", result.e164)
+        assertEquals("+86 139 6725 8941", result.display)
     }
 
     @Test

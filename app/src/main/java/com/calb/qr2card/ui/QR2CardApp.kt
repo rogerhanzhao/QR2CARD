@@ -65,7 +65,7 @@ import com.calb.qr2card.csv.BatchValidationRow
 import com.calb.qr2card.csv.CsvBatchService
 import com.calb.qr2card.data.EmployeeCardData
 import com.calb.qr2card.data.TemplateConfig
-import com.calb.qr2card.data.displayCardAddressLines
+import com.calb.qr2card.data.displayContactRows
 import com.calb.qr2card.data.defaultCompanyLines
 import com.calb.qr2card.domain.VCardService
 import com.calb.qr2card.pdf.PdfRendererService
@@ -258,15 +258,26 @@ private fun SingleCardScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         EditableDropdown(
-            label = "Department",
+            label = "Company Line",
             value = data.companyLine,
             options = defaultCompanyLines,
             onValueChange = { value -> viewModel.updateCardData { it.copy(companyLine = value) } },
         )
         Field("English Name", data.englishName) { value -> viewModel.updateCardData { it.copy(englishName = value) } }
+        Text(
+            text = "Name Font Size: ${String.format(Locale.US, "%.1f", data.nameFontSizePt)} pt",
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Slider(
+            value = data.nameFontSizePt,
+            onValueChange = { value -> viewModel.updateCardData { it.copy(nameFontSizePt = value) } },
+            valueRange = 8.5f..16f,
+            steps = 74,
+        )
         Field("First Name", data.firstName) { value -> viewModel.updateCardData { it.copy(firstName = value) } }
         Field("Last Name", data.lastName) { value -> viewModel.updateCardData { it.copy(lastName = value) } }
         Field("Title", data.title) { value -> viewModel.updateCardData { it.copy(title = value) } }
+        Field("Department (optional)", data.department) { value -> viewModel.updateCardData { it.copy(department = value) } }
         Field("Mobile Country", data.mobileCountryIso) { value -> viewModel.updateCardData { it.copy(mobileCountryIso = value.uppercase()) } }
         Field(
             label = "Mobile Number",
@@ -296,7 +307,6 @@ private fun SingleCardScreen(
         Field("State/Province", data.state) { value -> viewModel.updateCardData { it.copy(state = value) } }
         Field("Postcode", data.postcode) { value -> viewModel.updateCardData { it.copy(postcode = value) } }
         Field("Country", data.country) { value -> viewModel.updateCardData { it.copy(country = value) } }
-        Field("Company Line", data.note) { value -> viewModel.updateCardData { it.copy(note = value) } }
 
         ValidationPanel(state)
 
@@ -437,9 +447,9 @@ private fun SettingsScreen(state: CardUiState, viewModel: CardViewModel) {
         Text("Default Company Information", fontWeight = FontWeight.Bold)
         EditableDropdown(
             label = "Default Company Line",
-            value = data.note,
+            value = data.companyLine,
             options = defaultCompanyLines,
-            onValueChange = { value -> viewModel.updateCardData { it.copy(note = value) } },
+            onValueChange = { value -> viewModel.updateCardData { it.copy(companyLine = value) } },
         )
         Field("Default Website", data.website) { value -> viewModel.updateCardData { it.copy(website = value) } }
         HorizontalDivider()
@@ -570,7 +580,7 @@ private fun drawBusinessCardFront(
     drawTrackedCanvasText(
         canvas,
         paint,
-        "CALB Group Co., Ltd.",
+        data.companyLine,
         x(front.companyTop.x),
         y(front.companyTop.y),
         pt(front.companyTop.fontSize),
@@ -584,7 +594,7 @@ private fun drawBusinessCardFront(
         text = data.englishName,
         x = x(front.name.x),
         baseline = y(front.name.y),
-        fontPx = pt(front.name.fontSize),
+        fontPx = pt(data.nameFontSizePt),
         maxWidthPx = x(34f),
         typeface = boldTypeface,
         minFontPx = pt(front.name.minFontSize),
@@ -601,43 +611,34 @@ private fun drawBusinessCardFront(
         y(3.1f),
         typeface = regularTypeface,
     )
-    drawFittedCanvasText(
-        canvas,
-        paint,
-        data.companyLine,
-        x(front.companyLine.x),
-        y(front.companyLine.y),
-        pt(front.companyLine.fontSize),
-        x(36f),
-        typeface = regularTypeface,
-    )
-
-    val mobileLines = buildList {
-        add(data.mobileDisplay)
-        if (data.mobile2Display.isNotBlank()) add(data.mobile2Display)
+    if (data.department.isNotBlank()) {
+        drawFittedCanvasText(
+            canvas,
+            paint,
+            data.department,
+            x(front.companyLine.x),
+            y(front.companyLine.y),
+            pt(front.companyLine.fontSize),
+            x(36f),
+            typeface = regularTypeface,
+        )
     }
-    val labels = listOf("Mobile", "Mail", "Postcode", "Address")
-    val values = listOf(
-        mobileLines,
-        listOf(data.email),
-        listOf(data.postcode),
-        data.displayCardAddressLines(),
-    )
+
     val rowGap = 3.75f
     var cursorYmm = front.infoLabels.y
-    labels.forEachIndexed { index, label ->
+    data.displayContactRows().forEach { row ->
         val baseline = y(cursorYmm)
         drawFittedCanvasText(
             canvas,
             paint,
-            label,
+            row.label,
             x(front.infoLabels.x),
             baseline,
             pt(front.infoLabels.fontSize),
             x(10.2f),
             typeface = regularTypeface,
         )
-        values[index].forEachIndexed { lineIndex, value ->
+        row.values.forEachIndexed { lineIndex, value ->
             drawFittedCanvasText(
                 canvas,
                 paint,
@@ -650,7 +651,7 @@ private fun drawBusinessCardFront(
                 typeface = regularTypeface,
             )
         }
-        cursorYmm += rowGap * values[index].size
+        cursorYmm += rowGap * row.values.size
     }
 }
 
@@ -876,7 +877,7 @@ private fun Field(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
-        singleLine = label != "Note",
+        singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         modifier = Modifier.fillMaxWidth(),
     )

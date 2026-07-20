@@ -13,7 +13,7 @@ import android.os.Environment
 import com.calb.qr2card.R
 import com.calb.qr2card.data.EmployeeCardData
 import com.calb.qr2card.data.TemplateConfig
-import com.calb.qr2card.data.displayCardAddressLines
+import com.calb.qr2card.data.displayContactRows
 import com.calb.qr2card.data.exportSafeName
 import com.calb.qr2card.domain.VCardService
 import com.calb.qr2card.qr.QrCodeService
@@ -173,7 +173,7 @@ class PdfRendererService(
         drawTrackedFittedText(
             canvas = canvas,
             paint = textPaint,
-            text = "CALB Group Co., Ltd.",
+            text = data.companyLine,
             x = x(config.front.companyTop.x, trimOffsetMm),
             y = y(config.front.companyTop.y, trimOffsetMm),
             desiredSize = config.front.companyTop.fontSize,
@@ -189,7 +189,7 @@ class PdfRendererService(
             text = data.englishName,
             x = x(config.front.name.x, trimOffsetMm),
             y = y(config.front.name.y, trimOffsetMm),
-            desiredSize = config.front.name.fontSize,
+            desiredSize = data.nameFontSizePt,
             minSize = config.front.name.minFontSize,
             maxWidth = PdfMath.mmToPt(37f),
         )
@@ -206,13 +206,18 @@ class PdfRendererService(
             maxLines = 2,
         )
 
-        textPaint.textSize = config.front.companyLine.fontSize
-        canvas.drawText(
-            data.companyLine,
-            x(config.front.companyLine.x, trimOffsetMm),
-            y(config.front.companyLine.y, trimOffsetMm),
-            textPaint,
-        )
+        if (data.department.isNotBlank()) {
+            drawFittedText(
+                canvas = canvas,
+                paint = textPaint,
+                text = data.department,
+                x = x(config.front.companyLine.x, trimOffsetMm),
+                y = y(config.front.companyLine.y, trimOffsetMm),
+                desiredSize = config.front.companyLine.fontSize,
+                minSize = 4.8f,
+                maxWidth = PdfMath.mmToPt(36f),
+            )
+        }
 
         drawContactBlock(canvas, data, config, trimOffsetMm, textPaint)
     }
@@ -499,25 +504,14 @@ class PdfRendererService(
         trimOffsetMm: Float,
         basePaint: Paint,
     ) {
-        val mobileLines = buildList {
-            add(data.mobileDisplay)
-            if (data.mobile2Display.isNotBlank()) add(data.mobile2Display)
-        }
-        val labels = listOf("Mobile", "Mail", "Postcode", "Address")
-        val values = listOf(
-            mobileLines,
-            listOf(data.email),
-            listOf(data.postcode),
-            data.displayCardAddressLines(),
-        )
         val labelPaint = Paint(basePaint).apply { textSize = config.front.infoLabels.fontSize }
         val valuePaint = Paint(basePaint).apply { textSize = config.front.infoValues.fontSize }
         val rowGap = PdfMath.mmToPt(3.75f)
         var cursorY = y(config.front.infoLabels.y, trimOffsetMm)
 
-        labels.forEachIndexed { index, label ->
-            canvas.drawText(label, x(config.front.infoLabels.x, trimOffsetMm), cursorY, labelPaint)
-            values[index].forEachIndexed { lineIndex, value ->
+        data.displayContactRows().forEach { row ->
+            canvas.drawText(row.label, x(config.front.infoLabels.x, trimOffsetMm), cursorY, labelPaint)
+            row.values.forEachIndexed { lineIndex, value ->
                 drawFittedText(
                     canvas = canvas,
                     paint = valuePaint,
@@ -529,7 +523,7 @@ class PdfRendererService(
                     maxWidth = PdfMath.mmToPt(31.2f),
                 )
             }
-            cursorY += rowGap * values[index].size
+            cursorY += rowGap * row.values.size
         }
     }
 

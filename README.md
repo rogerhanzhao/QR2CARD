@@ -56,14 +56,15 @@ CLI build, after installing JDK 17 and Android SDK:
 Use `samples/batch_cards.csv` as the import format:
 
 ```csv
-EnglishName,FirstName,LastName,Title,CompanyLine,MobileCountry,MobileNumber,Email,Website,Street,City,State,Postcode,Country,Note
+EnglishName,FirstName,LastName,Title,CompanyLine,Department,MobileCountry,MobileNumber,Email,Website,Street,City,State,Postcode,Country
 ```
 
 The app validates each row. Valid rows can be exported into a ZIP containing preview PNG, print PDF, VCF, QR PNG, and `batch_validation_report.csv`.
+`Department` is optional; the prior `Note` column is accepted for backward-compatible imports.
 
 ## Phone Normalization
 
-Phone numbers are parsed with Google's libphonenumber. Display values use E.164 plus a country label, for example `+14015927928 (US)`. vCard `TEL` values always use E.164, for example `+14015927928`.
+Phone numbers are parsed with Google's libphonenumber. The card displays US numbers as `+1 (213) 589-7421` and China numbers as `+86 139 6725 8941`; vCard `TEL` values always use E.164, for example `+14015927928`.
 
 ## Assets
 

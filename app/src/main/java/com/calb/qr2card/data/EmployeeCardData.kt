@@ -1,5 +1,7 @@
 package com.calb.qr2card.data
 
+const val DEFAULT_NAME_FONT_SIZE_PT = 12.6f
+
 data class AddressPreset(
     val name: String,
     val street: String,
@@ -10,15 +12,22 @@ data class AddressPreset(
     val displayCountryShort: String,
 )
 
+data class ContactDisplayRow(
+    val label: String,
+    val values: List<String>,
+)
+
 data class EmployeeCardData(
     val englishName: String = "Alex Zhao",
     val firstName: String = "Alex",
     val lastName: String = "Zhao",
     val title: String = "Director of Pre-sale & Solution",
-    val companyLine: String = "CALB Americas Inc",
+    val companyLine: String = "CALB Group Co., Ltd.",
+    val department: String = "",
+    val nameFontSizePt: Float = DEFAULT_NAME_FONT_SIZE_PT,
     val mobileCountryIso: String = "US",
     val mobileRawInput: String = "4015927928",
-    val mobileDisplay: String = "+14015927928 (US)",
+    val mobileDisplay: String = "+1 (401) 592-7928",
     val mobileE164: String = "+14015927928",
     val mobile2CountryIso: String = "CN",
     val mobile2RawInput: String = "",
@@ -31,7 +40,6 @@ data class EmployeeCardData(
     val state: String = "TX",
     val postcode: String = "77423",
     val country: String = "United States",
-    val note: String = "CALB Group Co. Ltd.",
 )
 
 val defaultCompanyLines = listOf(
@@ -76,6 +84,21 @@ fun EmployeeCardData.displayCardAddressLines(): List<String> {
         .filter { it.isNotBlank() }
         .joinToString(" ")
     return listOf(line1, line2).filter { it.isNotBlank() }
+}
+
+fun EmployeeCardData.displayContactRows(): List<ContactDisplayRow> = buildList {
+    add(ContactDisplayRow(telephoneLabel(mobileCountryIso), listOf(mobileDisplay)))
+    if (mobile2Display.isNotBlank()) {
+        add(ContactDisplayRow(telephoneLabel(mobile2CountryIso), listOf(mobile2Display)))
+    }
+    add(ContactDisplayRow("Mail", listOf(email)))
+    add(ContactDisplayRow("Address", displayCardAddressLines()))
+}
+
+private fun telephoneLabel(countryIso: String): String = when (countryIso.trim().uppercase()) {
+    "US" -> "US Tel:"
+    "CN" -> "CN Tel:"
+    else -> "Tel:"
 }
 
 fun EmployeeCardData.countryShort(): String = when (country.trim().lowercase()) {

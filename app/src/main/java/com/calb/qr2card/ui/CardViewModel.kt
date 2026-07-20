@@ -10,6 +10,7 @@ import com.calb.qr2card.data.EmployeeCardData
 import com.calb.qr2card.data.TemplateConfig
 import com.calb.qr2card.data.TemplateRepository
 import com.calb.qr2card.data.defaultAddressPresets
+import com.calb.qr2card.domain.PhoneNormalizer
 import com.calb.qr2card.domain.ValidationResult
 import com.calb.qr2card.domain.ValidationService
 import java.io.File
@@ -36,6 +37,7 @@ data class CardUiState(
 class CardViewModel(
     private val validationService: ValidationService = ValidationService(),
     private val templateRepository: TemplateRepository = TemplateRepository(),
+    private val phoneNormalizer: PhoneNormalizer = PhoneNormalizer(),
 ) : ViewModel() {
     var uiState by mutableStateOf(CardUiState())
         private set
@@ -49,8 +51,9 @@ class CardViewModel(
     }
 
     fun updateCardData(update: (EmployeeCardData) -> EmployeeCardData) {
+        val updatedData = update(uiState.cardData)
         uiState = uiState.copy(
-            cardData = update(uiState.cardData),
+            cardData = updatePhoneDisplays(updatedData),
             validationResult = null,
             statusMessage = null,
         )
@@ -108,6 +111,19 @@ class CardViewModel(
             templateConfig = old.copy(
                 back = old.back.copy(qr = old.back.qr.copy(size = sizeMm)),
             ),
+        )
+    }
+
+    private fun updatePhoneDisplays(data: EmployeeCardData): EmployeeCardData {
+        val primary = phoneNormalizer.normalize(data.mobileRawInput, data.mobileCountryIso)
+        val secondary = if (data.mobile2RawInput.isBlank()) null else {
+            phoneNormalizer.normalize(data.mobile2RawInput, data.mobile2CountryIso)
+        }
+        return data.copy(
+            mobileDisplay = primary.display.takeIf { primary.isValid }.orEmpty(),
+            mobileE164 = primary.e164.takeIf { primary.isValid }.orEmpty(),
+            mobile2Display = secondary?.takeIf { it.isValid }?.display.orEmpty(),
+            mobile2E164 = secondary?.takeIf { it.isValid }?.e164.orEmpty(),
         )
     }
 }

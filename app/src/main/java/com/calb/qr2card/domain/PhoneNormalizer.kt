@@ -32,7 +32,10 @@ class PhoneNormalizer(
                 val e164 = phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164)
                 PhoneNormalizationResult(
                     isValid = true,
-                    display = "$e164 ($region)",
+                    display = when (region) {
+                        "US" -> "+${parsed.countryCode} ${phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.NATIONAL)}"
+                        else -> phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.INTERNATIONAL)
+                    },
                     e164 = e164,
                 )
             }

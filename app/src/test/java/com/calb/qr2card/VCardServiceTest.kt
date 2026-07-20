@@ -2,6 +2,7 @@ package com.calb.qr2card
 
 import com.calb.qr2card.data.EmployeeCardData
 import com.calb.qr2card.domain.VCardService
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -25,12 +26,14 @@ class VCardServiceTest {
                 firstName = "Alex",
                 lastName = "Zhao",
                 title = "Director, Pre-sale",
-                note = "Line 1\nLine 2",
+                companyLine = "CALB Americas Inc",
+                department = "Sales; Marketing",
             ),
         )
 
         assertTrue(vCard.contains("FN:Alex\\; Zhao"))
         assertTrue(vCard.contains("TITLE:Director\\, Pre-sale"))
-        assertTrue(vCard.contains("NOTE:Line 1\\nLine 2"))
+        assertTrue(vCard.contains("ORG:CALB Americas Inc;Sales\\; Marketing"))
+        assertFalse(vCard.contains("NOTE:"))
     }
 }
