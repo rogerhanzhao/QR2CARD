@@ -80,7 +80,10 @@ fun EmployeeCardData.displayCardAddressLines(): List<String> {
     val locality = listOf(city, state)
         .filter { it.isNotBlank() }
         .joinToString(", ")
-    val line2 = listOf(locality, "${postcode.trim()},${countryShort()}")
+    val postcodeCountry = listOf(postcode.trim(), countryShort())
+        .filter { it.isNotBlank() }
+        .joinToString(", ")
+    val line2 = listOf(locality, postcodeCountry)
         .filter { it.isNotBlank() }
         .joinToString(" ")
     return listOf(line1, line2).filter { it.isNotBlank() }

@@ -1,22 +1,16 @@
 package com.calb.qr2card.ui
 
-import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
-import android.graphics.Typeface
-import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.Canvas
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,11 +38,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -59,19 +53,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.calb.qr2card.R
 import com.calb.qr2card.csv.BatchExportService
 import com.calb.qr2card.csv.BatchValidationRow
 import com.calb.qr2card.csv.CsvBatchService
 import com.calb.qr2card.data.EmployeeCardData
 import com.calb.qr2card.data.TemplateConfig
-import com.calb.qr2card.data.displayContactRows
 import com.calb.qr2card.data.defaultCompanyLines
 import com.calb.qr2card.domain.VCardService
 import com.calb.qr2card.pdf.PdfRendererService
-import com.calb.qr2card.qr.QrCodeService
-import com.calb.qr2card.util.BrandFonts
-import com.calb.qr2card.util.decodeSampledBitmapResource
 import com.calb.qr2card.util.ShareUtils
 import java.util.Locale
 
@@ -493,15 +482,12 @@ private fun AboutScreen() {
 @Composable
 private fun BusinessCardPreview(data: EmployeeCardData, front: Boolean, config: TemplateConfig) {
     val context = LocalContext.current
-    val logoBitmap = remember {
-        decodeSampledBitmapResource(context.resources, R.drawable.calb_logo, 1200, 400)
+    val renderer = remember { PdfRendererService() }
+    val artwork = remember(data, config, front) {
+        renderer.renderPreviewCardBitmap(context, data, config, front)
     }
-    val watermarkBitmap = remember {
-        decodeSampledBitmapResource(context.resources, R.drawable.calb_watermark_outline, 1800, 1100)
-    }
-    val qrBitmap = remember(data) {
-        val vCard = VCardService().buildVCard(data)
-        QrCodeService().generateQrBitmap(vCard, 1024, backgroundColor = AndroidColor.TRANSPARENT)
+    DisposableEffect(artwork) {
+        onDispose { artwork.recycle() }
     }
 
     Canvas(
@@ -513,341 +499,14 @@ private fun BusinessCardPreview(data: EmployeeCardData, front: Boolean, config: 
             .border(1.dp, WiseGrey, RoundedCornerShape(4.dp)),
     ) {
         drawIntoCanvas { canvas ->
-            val nativeCanvas = canvas.nativeCanvas
-            if (front) {
-                drawBusinessCardFront(
-                    nativeCanvas,
-                    context,
-                    size.width,
-                    size.height,
-                    data,
-                    config,
-                    logoBitmap,
-                    watermarkBitmap,
-                )
-            } else {
-                drawBusinessCardBack(nativeCanvas, context, size.width, size.height, data, config, qrBitmap)
-            }
-        }
-    }
-}
-
-private fun drawBusinessCardFront(
-    canvas: android.graphics.Canvas,
-    context: Context,
-    widthPx: Float,
-    heightPx: Float,
-    data: EmployeeCardData,
-    config: TemplateConfig,
-    logoBitmap: Bitmap?,
-    watermarkBitmap: Bitmap?,
-) {
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    val blue = AndroidColor.rgb(35, 73, 107)
-    val regularTypeface = BrandFonts.manropeRegular(context)
-    val boldTypeface = BrandFonts.manropeBold(context)
-    fun x(mm: Float) = widthPx * mm / CardWidthMm
-    fun y(mm: Float) = heightPx * mm / CardHeightMm
-    fun pt(value: Float) = value * heightPx / (CardHeightMm * 72f / 25.4f)
-
-    drawPreviewPaperBackground(canvas, widthPx, heightPx)
-
-    logoBitmap?.let { logo ->
-        val box = config.front.logo
-        drawBitmapFit(
-            canvas = canvas,
-            bitmap = logo,
-            target = RectF(x(box.x), y(box.y), x(box.x + box.w), y(box.y + box.h)),
-        )
-    }
-
-    watermarkBitmap?.let { watermark ->
-        val box = config.front.watermark
-        drawBitmapStretch(
-            canvas = canvas,
-            bitmap = watermark,
-            target = RectF(x(box.x), y(box.y), x(box.x + box.w), y(box.y + box.h)),
-        )
-    }
-
-    paint.color = blue
-    paint.style = Paint.Style.FILL
-    paint.strokeWidth = 0f
-    paint.typeface = regularTypeface
-    paint.textAlign = Paint.Align.LEFT
-
-    val front = config.front
-    drawTrackedCanvasText(
-        canvas,
-        paint,
-        data.companyLine,
-        x(front.companyTop.x),
-        y(front.companyTop.y),
-        pt(front.companyTop.fontSize),
-        x(42f),
-        x(0.14f),
-        typeface = regularTypeface,
-    )
-    drawFittedCanvasText(
-        canvas = canvas,
-        paint = paint,
-        text = data.englishName,
-        x = x(front.name.x),
-        baseline = y(front.name.y),
-        fontPx = pt(data.nameFontSizePt),
-        maxWidthPx = x(34f),
-        typeface = boldTypeface,
-        minFontPx = pt(front.name.minFontSize),
-    )
-    drawWrappedCanvasText(
-        canvas,
-        paint,
-        data.title,
-        x(front.title.x),
-        y(front.title.y),
-        pt(front.title.fontSize),
-        x(38f),
-        2,
-        y(3.1f),
-        typeface = regularTypeface,
-    )
-    if (data.department.isNotBlank()) {
-        drawFittedCanvasText(
-            canvas,
-            paint,
-            data.department,
-            x(front.companyLine.x),
-            y(front.companyLine.y),
-            pt(front.companyLine.fontSize),
-            x(36f),
-            typeface = regularTypeface,
-        )
-    }
-
-    val rowGap = 3.75f
-    var cursorYmm = front.infoLabels.y
-    data.displayContactRows().forEach { row ->
-        val baseline = y(cursorYmm)
-        drawFittedCanvasText(
-            canvas,
-            paint,
-            row.label,
-            x(front.infoLabels.x),
-            baseline,
-            pt(front.infoLabels.fontSize),
-            x(10.2f),
-            typeface = regularTypeface,
-        )
-        row.values.forEachIndexed { lineIndex, value ->
-            drawFittedCanvasText(
-                canvas,
-                paint,
-                value,
-                x(front.infoValues.x),
-                baseline + y(rowGap * lineIndex),
-                pt(front.infoValues.fontSize),
-                x(31.2f),
-                minFontPx = pt(4.4f),
-                typeface = regularTypeface,
+            canvas.nativeCanvas.drawBitmap(
+                artwork,
+                Rect(0, 0, artwork.width, artwork.height),
+                RectF(0f, 0f, size.width, size.height),
+                Paint(Paint.FILTER_BITMAP_FLAG),
             )
         }
-        cursorYmm += rowGap * row.values.size
     }
-}
-
-private fun drawBusinessCardBack(
-    canvas: android.graphics.Canvas,
-    context: Context,
-    widthPx: Float,
-    heightPx: Float,
-    data: EmployeeCardData,
-    config: TemplateConfig,
-    qrBitmap: Bitmap,
-) {
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    val regularTypeface = BrandFonts.manropeRegular(context)
-    fun x(mm: Float) = widthPx * mm / CardWidthMm
-    fun y(mm: Float) = heightPx * mm / CardHeightMm
-    fun pt(value: Float) = value * heightPx / (CardHeightMm * 72f / 25.4f)
-
-    drawPreviewPaperBackground(canvas, widthPx, heightPx)
-    drawBitmapFit(
-        canvas = canvas,
-        bitmap = qrBitmap,
-        target = RectF(
-            x(config.back.qr.x),
-            y(config.back.qr.y),
-            x(config.back.qr.x + config.back.qr.size),
-            y(config.back.qr.y + config.back.qr.size),
-        ),
-    )
-    paint.color = AndroidColor.rgb(34, 34, 34)
-    paint.style = Paint.Style.FILL
-    paint.textAlign = Paint.Align.CENTER
-    paint.typeface = regularTypeface
-    paint.textSize = pt(config.back.caption.fontSize)
-    canvas.drawText("Scan and Save Contact", widthPx / 2f, y(config.back.caption.y), paint)
-}
-
-private fun drawBitmapFit(
-    canvas: android.graphics.Canvas,
-    bitmap: Bitmap,
-    target: RectF,
-) {
-    val sourceRatio = bitmap.width.toFloat() / bitmap.height.toFloat()
-    val targetRatio = target.width() / target.height()
-    val fitted = RectF(target)
-    if (sourceRatio > targetRatio) {
-        val fittedHeight = target.width() / sourceRatio
-        fitted.top = target.top + (target.height() - fittedHeight) / 2f
-        fitted.bottom = fitted.top + fittedHeight
-    } else {
-        val fittedWidth = target.height() * sourceRatio
-        fitted.left = target.left + (target.width() - fittedWidth) / 2f
-        fitted.right = fitted.left + fittedWidth
-    }
-    canvas.drawBitmap(bitmap, Rect(0, 0, bitmap.width, bitmap.height), fitted, null)
-}
-
-private fun drawBitmapStretch(
-    canvas: android.graphics.Canvas,
-    bitmap: Bitmap,
-    target: RectF,
-) {
-    canvas.drawBitmap(bitmap, Rect(0, 0, bitmap.width, bitmap.height), target, null)
-}
-
-private fun drawPreviewPaperBackground(
-    canvas: android.graphics.Canvas,
-    widthPx: Float,
-    heightPx: Float,
-) {
-    canvas.drawColor(AndroidColor.WHITE)
-    val speckPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.rgb(206, 219, 234)
-        alpha = 6
-        strokeWidth = 0.45f
-    }
-    var row = 0
-    var y = heightPx * 2.2f / CardHeightMm
-    while (y < heightPx) {
-        var px = widthPx * (if (row % 2 == 0) 1.4f else 4.8f) / CardWidthMm
-        while (px < widthPx) {
-            canvas.drawPoint(px, y, speckPaint)
-            px += widthPx * 8.6f / CardWidthMm
-        }
-        row += 1
-        y += heightPx * 5.8f / CardHeightMm
-    }
-}
-
-private fun drawFittedCanvasText(
-    canvas: android.graphics.Canvas,
-    paint: Paint,
-    text: String,
-    x: Float,
-    baseline: Float,
-    fontPx: Float,
-    maxWidthPx: Float,
-    minFontPx: Float = fontPx * 0.78f,
-    typeface: Typeface = Typeface.DEFAULT,
-) {
-    paint.style = Paint.Style.FILL
-    paint.strokeWidth = 0f
-    paint.textAlign = Paint.Align.LEFT
-    paint.typeface = typeface
-    paint.textSize = fontPx
-    while (paint.measureText(text) > maxWidthPx && paint.textSize > minFontPx) {
-        paint.textSize -= 0.5f
-    }
-    canvas.drawText(text, x, baseline, paint)
-}
-
-private fun drawTrackedCanvasText(
-    canvas: android.graphics.Canvas,
-    paint: Paint,
-    text: String,
-    x: Float,
-    baseline: Float,
-    fontPx: Float,
-    maxWidthPx: Float,
-    trackingPx: Float,
-    minFontPx: Float = fontPx * 0.78f,
-    typeface: Typeface = Typeface.DEFAULT,
-) {
-    paint.style = Paint.Style.FILL
-    paint.strokeWidth = 0f
-    paint.textAlign = Paint.Align.LEFT
-    paint.typeface = typeface
-    paint.textSize = fontPx
-    while (measureTrackedCanvasText(paint, text, trackingPx) > maxWidthPx && paint.textSize > minFontPx) {
-        paint.textSize -= 0.5f
-    }
-    var cursor = x
-    text.forEach { char ->
-        val value = char.toString()
-        canvas.drawText(value, cursor, baseline, paint)
-        cursor += paint.measureText(value) + trackingPx
-    }
-}
-
-private fun measureTrackedCanvasText(paint: Paint, text: String, trackingPx: Float): Float {
-    if (text.isEmpty()) return 0f
-    var width = 0f
-    text.forEach { char -> width += paint.measureText(char.toString()) }
-    return width + trackingPx * (text.length - 1)
-}
-
-private fun drawWrappedCanvasText(
-    canvas: android.graphics.Canvas,
-    paint: Paint,
-    text: String,
-    x: Float,
-    firstBaseline: Float,
-    fontPx: Float,
-    maxWidthPx: Float,
-    maxLines: Int,
-    lineGapPx: Float,
-    typeface: Typeface = Typeface.DEFAULT,
-) {
-    paint.style = Paint.Style.FILL
-    paint.strokeWidth = 0f
-    paint.textAlign = Paint.Align.LEFT
-    paint.typeface = typeface
-    paint.textSize = fontPx
-    val lines = wrapCanvasText(paint, text, maxWidthPx, maxLines)
-    lines.forEachIndexed { index, line ->
-        canvas.drawText(line, x, firstBaseline + index * lineGapPx, paint)
-    }
-}
-
-private fun wrapCanvasText(
-    paint: Paint,
-    text: String,
-    maxWidthPx: Float,
-    maxLines: Int,
-): List<String> {
-    val words = text.split(Regex("\\s+")).filter { it.isNotBlank() }
-    val lines = mutableListOf<String>()
-    var current = ""
-    words.forEach { word ->
-        val candidate = if (current.isBlank()) word else "$current $word"
-        if (paint.measureText(candidate) <= maxWidthPx || current.isBlank()) {
-            current = candidate
-        } else {
-            lines += current
-            current = word
-        }
-    }
-    if (current.isNotBlank()) lines += current
-    if (lines.size <= maxLines) return lines
-    val clipped = lines.take(maxLines).toMutableList()
-    var last = clipped.last()
-    while (paint.measureText("$last...") > maxWidthPx && last.length > 3) {
-        last = last.dropLast(1)
-    }
-    clipped[clipped.lastIndex] = "$last..."
-    return clipped
 }
 
 @Composable

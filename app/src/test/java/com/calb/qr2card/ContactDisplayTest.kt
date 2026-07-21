@@ -21,5 +21,6 @@ class ContactDisplayTest {
         assertEquals(listOf("+86 139 6725 8941"), rows[1].values)
         assertEquals("Mail", rows[2].label)
         assertEquals("Address", rows[3].label)
+        assertEquals(listOf("839 FM 1489 Rd,", "Brookshire, TX 77423, US"), rows[3].values)
     }
 }

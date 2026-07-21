@@ -37,27 +37,18 @@ class PdfRendererService(
         outputDir: File? = null,
     ): File {
         val scale = PREVIEW_IMAGE_DPI / 72f
-        val cardWidthPt = PdfMath.mmToPt(config.page.finishedWidthMm)
-        val cardHeightPt = PdfMath.mmToPt(config.page.finishedHeightMm)
-        val cardWidthPx = (cardWidthPt * scale).roundToInt()
-        val cardHeightPx = (cardHeightPt * scale).roundToInt()
         val gapPx = (PdfMath.mmToPt(PREVIEW_IMAGE_GAP_MM) * scale).roundToInt()
-
-        val frontBitmap = renderCardBitmap(cardWidthPx, cardHeightPx, scale) { canvas ->
-            renderFrontPage(context, canvas, data, config, isPrintMode = false)
-        }
-        val backBitmap = renderCardBitmap(cardWidthPx, cardHeightPx, scale) { canvas ->
-            renderBackPage(context, canvas, data, config, isPrintMode = false)
-        }
+        val frontBitmap = renderPreviewCardBitmap(context, data, config, front = true)
+        val backBitmap = renderPreviewCardBitmap(context, data, config, front = false)
         val previewBitmap = Bitmap.createBitmap(
-            cardWidthPx,
-            cardHeightPx * 2 + gapPx,
+            frontBitmap.width,
+            frontBitmap.height + backBitmap.height + gapPx,
             Bitmap.Config.ARGB_8888,
         )
         Canvas(previewBitmap).apply {
             drawColor(Color.WHITE)
             drawBitmap(frontBitmap, 0f, 0f, null)
-            drawBitmap(backBitmap, 0f, (cardHeightPx + gapPx).toFloat(), null)
+            drawBitmap(backBitmap, 0f, (frontBitmap.height + gapPx).toFloat(), null)
         }
 
         val dir = outputDir ?: File(
@@ -73,6 +64,25 @@ class PdfRendererService(
         backBitmap.recycle()
         previewBitmap.recycle()
         return file
+    }
+
+    /** Returns the exact 300 DPI card artwork used by the exported Preview PNG. */
+    fun renderPreviewCardBitmap(
+        context: Context,
+        data: EmployeeCardData,
+        config: TemplateConfig,
+        front: Boolean,
+    ): Bitmap {
+        val scale = PREVIEW_IMAGE_DPI / 72f
+        val cardWidthPx = (PdfMath.mmToPt(config.page.finishedWidthMm) * scale).roundToInt()
+        val cardHeightPx = (PdfMath.mmToPt(config.page.finishedHeightMm) * scale).roundToInt()
+        return renderCardBitmap(cardWidthPx, cardHeightPx, scale) { canvas ->
+            if (front) {
+                renderFrontPage(context, canvas, data, config, isPrintMode = false)
+            } else {
+                renderBackPage(context, canvas, data, config, isPrintMode = false)
+            }
+        }
     }
 
     fun generatePrintPdf(
@@ -244,6 +254,7 @@ class PdfRendererService(
                 isFilterBitmap = false
             },
         )
+        qrBitmap.recycle()
 
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor(config.colors.black)
@@ -599,33 +610,13 @@ class PdfRendererService(
         tracking: Float,
     ) {
         paint.textSize = desiredSize
-        while (measureTrackedText(paint, text, tracking) > maxWidth && paint.textSize > minSize) {
+        paint.letterSpacing = tracking / paint.textSize
+        while (paint.measureText(text) > maxWidth && paint.textSize > minSize) {
             paint.textSize -= 0.2f
+            paint.letterSpacing = tracking / paint.textSize
         }
-        drawTrackedText(canvas, paint, text, x, y, tracking)
-    }
-
-    private fun drawTrackedText(
-        canvas: Canvas,
-        paint: Paint,
-        text: String,
-        x: Float,
-        y: Float,
-        tracking: Float,
-    ) {
-        var cursor = x
-        text.forEach { char ->
-            val value = char.toString()
-            canvas.drawText(value, cursor, y, paint)
-            cursor += paint.measureText(value) + tracking
-        }
-    }
-
-    private fun measureTrackedText(paint: Paint, text: String, tracking: Float): Float {
-        if (text.isEmpty()) return 0f
-        var width = 0f
-        text.forEach { char -> width += paint.measureText(char.toString()) }
-        return width + tracking * (text.length - 1)
+        canvas.drawText(text, x, y, paint)
+        paint.letterSpacing = 0f
     }
 
     private fun drawWrappedText(
