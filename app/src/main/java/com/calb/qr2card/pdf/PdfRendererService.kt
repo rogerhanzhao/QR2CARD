@@ -139,6 +139,17 @@ class PdfRendererService(
         return file
     }
 
+    /**
+     * Paint for card text. Card font sizes are in points (6.1-12.6) while the preview
+     * canvas is scaled up ~4.2x, so hinting would quantise glyph advances at the tiny
+     * point size and the error would then be magnified: letters drift apart and the
+     * 0.2em space collapses, running words together. LINEAR_TEXT/SUBPIXEL_TEXT keep
+     * advances linearly scaled and unrounded.
+     */
+    private fun newTextPaint(): Paint = Paint(
+        Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG or Paint.LINEAR_TEXT_FLAG,
+    )
+
     private fun renderCardBitmap(
         widthPx: Int,
         heightPx: Int,
@@ -176,7 +187,7 @@ class PdfRendererService(
             drawBitmapStretch(canvas, watermark, rect(config.front.watermark, trimOffsetMm))
         }
 
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val textPaint = newTextPaint().apply {
             color = deepBlue
             typeface = regularTypeface
         }
@@ -256,7 +267,7 @@ class PdfRendererService(
         )
         qrBitmap.recycle()
 
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val paint = newTextPaint().apply {
             color = Color.parseColor(config.colors.black)
             textSize = config.back.caption.fontSize
             typeface = BrandFonts.manropeRegular(context)
@@ -292,14 +303,14 @@ class PdfRendererService(
             ))
         }
 
-        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val titlePaint = newTextPaint().apply {
             color = deepBlue
             typeface = chineseTypeface
             textSize = 7.0f
         }
         canvas.drawText("印刷规格说明", x(7.0f, trimOffsetMm), y(20.0f, trimOffsetMm), titlePaint)
 
-        val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val bodyPaint = newTextPaint().apply {
             color = deepBlue
             typeface = chineseTypeface
             textSize = 4.4f
@@ -344,7 +355,7 @@ class PdfRendererService(
         drawPaperBackground(canvas, config, paperEffect = false)
         if (isPrintMode) drawCropMarks(canvas, config)
 
-        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val titlePaint = newTextPaint().apply {
             color = deepBlue
             typeface = chineseTypeface
             textSize = 7.0f
@@ -388,7 +399,7 @@ class PdfRendererService(
             detailTypeface = chineseTypeface,
         )
 
-        val notePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val notePaint = newTextPaint().apply {
             color = deepBlue
             typeface = chineseTypeface
             textSize = 4.1f
@@ -459,7 +470,7 @@ class PdfRendererService(
         val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fillColor }
         canvas.drawRect(box, fillPaint)
 
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val labelPaint = newTextPaint().apply {
             color = labelColor
             typeface = labelTypeface
             textSize = 4.5f
@@ -473,7 +484,7 @@ class PdfRendererService(
         labelPaint.typeface = chineseTypeface
         canvas.drawText(chinese, x(9.0f, trimOffsetMm), y(yMm + 9.4f, trimOffsetMm), labelPaint)
 
-        val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val detailPaint = newTextPaint().apply {
             color = Color.parseColor(config.colors.deepBlue)
             typeface = detailTypeface
             textSize = 4.0f
@@ -515,8 +526,8 @@ class PdfRendererService(
         trimOffsetMm: Float,
         basePaint: Paint,
     ) {
-        val labelPaint = Paint(basePaint).apply { textSize = config.front.infoLabels.fontSize }
-        val valuePaint = Paint(basePaint).apply { textSize = config.front.infoValues.fontSize }
+        val labelPaint = Paint(basePaint).apply { letterSpacing = 0f; textSize = config.front.infoLabels.fontSize }
+        val valuePaint = Paint(basePaint).apply { letterSpacing = 0f; textSize = config.front.infoValues.fontSize }
         val rowGap = PdfMath.mmToPt(3.75f)
         var cursorY = y(config.front.infoLabels.y, trimOffsetMm)
 
@@ -591,6 +602,7 @@ class PdfRendererService(
         minSize: Float,
         maxWidth: Float,
     ) {
+        paint.letterSpacing = 0f
         paint.textSize = desiredSize
         while (paint.measureText(text) > maxWidth && paint.textSize > minSize) {
             paint.textSize -= 0.2f
@@ -609,14 +621,16 @@ class PdfRendererService(
         maxWidth: Float,
         tracking: Float,
     ) {
-        paint.textSize = desiredSize
-        paint.letterSpacing = tracking / paint.textSize
-        while (paint.measureText(text) > maxWidth && paint.textSize > minSize) {
-            paint.textSize -= 0.2f
-            paint.letterSpacing = tracking / paint.textSize
+        // Use a dedicated paint so letterSpacing never contaminates the shared
+        // paint reused for the name/title/department/contact text below.
+        val trackedPaint = Paint(paint)
+        trackedPaint.textSize = desiredSize
+        trackedPaint.letterSpacing = tracking / trackedPaint.textSize
+        while (trackedPaint.measureText(text) > maxWidth && trackedPaint.textSize > minSize) {
+            trackedPaint.textSize -= 0.2f
+            trackedPaint.letterSpacing = tracking / trackedPaint.textSize
         }
-        canvas.drawText(text, x, y, paint)
-        paint.letterSpacing = 0f
+        canvas.drawText(text, x, y, trackedPaint)
     }
 
     private fun drawWrappedText(
@@ -629,6 +643,7 @@ class PdfRendererService(
         maxWidth: Float,
         maxLines: Int,
     ) {
+        paint.letterSpacing = 0f
         paint.textSize = fontSize
         val lines = wrapForPaint(paint, text, maxWidth, maxLines)
         val lineHeight = fontSize * 1.25f

@@ -90,18 +90,21 @@ fun EmployeeCardData.displayCardAddressLines(): List<String> {
 }
 
 fun EmployeeCardData.displayContactRows(): List<ContactDisplayRow> = buildList {
-    add(ContactDisplayRow(telephoneLabel(mobileCountryIso), listOf(mobileDisplay)))
-    if (mobile2Display.isNotBlank()) {
-        add(ContactDisplayRow(telephoneLabel(mobile2CountryIso), listOf(mobile2Display)))
+    val phones = listOfNotNull(
+        mobileDisplay.takeIf { it.isNotBlank() }?.let { phoneWithCountry(it, mobileCountryIso) },
+        mobile2Display.takeIf { it.isNotBlank() }?.let { phoneWithCountry(it, mobile2CountryIso) },
+    )
+    if (phones.isNotEmpty()) {
+        add(ContactDisplayRow("Mobile", phones))
     }
     add(ContactDisplayRow("Mail", listOf(email)))
     add(ContactDisplayRow("Address", displayCardAddressLines()))
 }
 
-private fun telephoneLabel(countryIso: String): String = when (countryIso.trim().uppercase()) {
-    "US" -> "US Tel:"
-    "CN" -> "CN Tel:"
-    else -> "Tel:"
+/** Appends the country code, e.g. "+1 (401) 592-7928 (US)", so both numbers sit under one "Mobile" label. */
+private fun phoneWithCountry(display: String, countryIso: String): String {
+    val iso = countryIso.trim().uppercase()
+    return if (iso.isBlank()) display else "$display ($iso)"
 }
 
 fun EmployeeCardData.countryShort(): String = when (country.trim().lowercase()) {
