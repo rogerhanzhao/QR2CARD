@@ -8,6 +8,7 @@ import com.calb.qr2card.data.exportSafeName
 import com.calb.qr2card.domain.VCardService
 import com.calb.qr2card.pdf.PdfRendererService
 import com.calb.qr2card.qr.QrCodeService
+import com.calb.qr2card.svg.EditableSvgPackageService
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -19,6 +20,7 @@ import java.util.zip.ZipOutputStream
 
 class BatchExportService(
     private val pdfRendererService: PdfRendererService = PdfRendererService(),
+    private val editableSvgPackageService: EditableSvgPackageService = EditableSvgPackageService(),
     private val qrCodeService: QrCodeService = QrCodeService(),
     private val vCardService: VCardService = VCardService(),
     private val csvBatchService: CsvBatchService = CsvBatchService(),
@@ -47,8 +49,10 @@ class BatchExportService(
 
                 val preview = pdfRendererService.generatePreviewImage(context, row.data, config, personDir)
                 val print = pdfRendererService.generatePrintPdf(context, row.data, config, personDir)
+                val editableSvg = editableSvgPackageService.generateEditableSvg(context, row.data, config, personDir)
                 zip.addFile(folder + preview.name, preview)
                 zip.addFile(folder + print.name, print)
+                zip.addFile(folder + editableSvg.name, editableSvg)
 
                 val vCard = vCardService.buildVCard(row.data)
                 zip.addText("$folder$safeName.vcf", vCard)

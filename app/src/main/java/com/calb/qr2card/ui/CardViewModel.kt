@@ -120,8 +120,10 @@ class CardViewModel(
             phoneNormalizer.normalize(data.mobile2RawInput, data.mobile2CountryIso)
         }
         return data.copy(
+            mobileCountryIso = primary.regionIso.takeIf { it.isNotBlank() } ?: data.mobileCountryIso,
             mobileDisplay = primary.display.takeIf { primary.isValid }.orEmpty(),
             mobileE164 = primary.e164.takeIf { primary.isValid }.orEmpty(),
+            mobile2CountryIso = secondary?.regionIso?.takeIf { it.isNotBlank() } ?: data.mobile2CountryIso,
             mobile2Display = secondary?.takeIf { it.isValid }?.display.orEmpty(),
             mobile2E164 = secondary?.takeIf { it.isValid }?.e164.orEmpty(),
         )

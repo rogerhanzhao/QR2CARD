@@ -15,6 +15,7 @@ The experimental iOS SwiftUI implementation lives on branch `codex/ios-version` 
 - Preview PNG containing only the front and back card artwork, with text and layout fixed as pixels.
 - Four-page print PDF at 98 mm x 62 mm with 3 mm bleed, crop marks, and downloadable print-ready card pages.
 - Print PDF pages 1-2 are the front/back card artwork. Pages 3-4 are Chinese print-detail notes for paper, dimensions, bleed, colors, QR, fonts, and delivery use.
+- Editable SVG (ZIP): one Illustrator-compatible SVG holding the front and back card, with editable text, vector QR squares, and embedded logo/watermark artwork. Delivered inside a ZIP (with the required fonts) because apps such as WeChat block a raw `.svg` attachment.
 - CSV batch import, validation report, and ZIP export for valid rows.
 - Local-only processing. No backend, account, analytics, or personal-data upload.
 
@@ -48,8 +49,8 @@ CLI build, after installing JDK 17 and Android SDK:
 2. Enter or edit employee data.
 3. Tap `Validate`.
 4. Review the front/back preview.
-5. Use `Preview PNG - Share...` or `Print PDF - Share...` to open the Android share sheet and send the file through installed messaging, email, or social apps.
-6. Use `Preview PNG - Save to...` or `Print PDF - Save to...` to choose a visible local/cloud destination with the Android system file picker.
+5. Use `Preview PNG - Share...`, `Print PDF - Share...`, or `Editable SVG (ZIP) - Share...` to open the Android share sheet and send the file through installed messaging, email, or social apps.
+6. Use the corresponding `Save to...` action to choose a visible local/cloud destination with the Android system file picker.
 
 ## Batch CSV
 
@@ -59,7 +60,7 @@ Use `samples/batch_cards.csv` as the import format:
 EnglishName,FirstName,LastName,Title,CompanyLine,Department,MobileCountry,MobileNumber,Email,Website,Street,City,State,Postcode,Country
 ```
 
-The app validates each row. Valid rows can be exported into a ZIP containing preview PNG, print PDF, VCF, QR PNG, and `batch_validation_report.csv`.
+The app validates each row. Valid rows can be exported into a ZIP containing preview PNG, print PDF, editable SVG, VCF, QR PNG, and `batch_validation_report.csv`.
 `Department` is optional; the prior `Note` column is accepted for backward-compatible imports.
 
 ## Phone Normalization
@@ -68,7 +69,7 @@ Phone numbers are parsed with Google's libphonenumber. The card displays US numb
 
 ## Assets
 
-The app uses `app/src/main/res/drawable/calb_logo.png`, copied from the provided CALB logo image. Replace that file to update the logo. Keep the replacement high resolution and transparent if possible.
+The app uses `app/src/main/res/drawable/calb_logo.png`, copied from the provided CALB logo image. Replace that file to update the logo. Keep the replacement high resolution and transparent if possible. The current project has no original CALB AI/SVG/EPS assets; therefore the Editable SVG embeds the approved PNG logo and watermark directly in the file, so it opens correctly wherever it is moved. Supply approved vector artwork to make those two brand elements editable too.
 
 Bundled PDF/card fonts live in `app/src/main/assets/fonts/`:
 
@@ -83,4 +84,7 @@ Template coordinates live in `app/src/main/assets/template_config.json`. Coordin
 
 - The PDF renderer uses Android `PdfDocument`, so page dimensions are rounded to whole PDF points.
 - PDF text uses bundled project font files instead of Android system sans-serif to keep output typography consistent across devices.
+- Print PDF is a print-production file, not an Adobe Illustrator source file. Use the Editable SVG (ZIP) for Illustrator editing; unzip it and install the bundled Manrope and HarmonyOS Sans SC fonts first so the text renders as intended.
+- The Editable SVG covers the card faces only. The Chinese print-detail notes stay on pages 3-4 of the Print PDF.
+- Phone numbers are not restricted to one nationality: a `+`-prefixed number (e.g. Brazil `+55 …`) is accepted regardless of the country field, and the `(XX)` card suffix is taken from the number itself.
 - Advanced template editing is file-based in V1 rather than a full visual editor.

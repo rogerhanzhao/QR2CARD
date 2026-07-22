@@ -70,7 +70,7 @@ class ValidationService(
 
         var normalizedData = if (phone.isValid) {
             data.copy(
-                mobileCountryIso = data.mobileCountryIso.uppercase(),
+                mobileCountryIso = phone.regionIso.takeIf { it.isNotBlank() } ?: data.mobileCountryIso.uppercase(),
                 mobileDisplay = phone.display,
                 mobileE164 = phone.e164,
             )
@@ -84,7 +84,7 @@ class ValidationService(
                 mobile2E164 = "",
             )
             phone2.isValid -> normalizedData.copy(
-                mobile2CountryIso = normalizedData.mobile2CountryIso.uppercase(),
+                mobile2CountryIso = phone2.regionIso.takeIf { it.isNotBlank() } ?: normalizedData.mobile2CountryIso.uppercase(),
                 mobile2Display = phone2.display,
                 mobile2E164 = phone2.e164,
             )

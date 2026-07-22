@@ -410,7 +410,7 @@ class PdfRendererService(
             lines = listOf(
                 "BLACK 黑色：HEX #1E1E1E（CMYK 0/0/0/100）。用途：二维码与说明文字。",
                 "QR 纯黑输出、保留四周静区，交付前需实机扫码确认。",
-                "本 PDF 为矢量文件，文字可在 Adobe Illustrator 中直接编辑。",
+                "Print PDF 用于印刷；Editable SVG Package 用于 Adobe Illustrator 编辑。",
             ),
             x = x(7.0f, trimOffsetMm),
             firstBaseline = y(45.5f, trimOffsetMm),

@@ -61,6 +61,7 @@ import com.calb.qr2card.data.TemplateConfig
 import com.calb.qr2card.data.defaultCompanyLines
 import com.calb.qr2card.domain.VCardService
 import com.calb.qr2card.pdf.PdfRendererService
+import com.calb.qr2card.svg.EditableSvgPackageService
 import com.calb.qr2card.util.ShareUtils
 import java.util.Locale
 
@@ -75,6 +76,7 @@ fun QR2CardApp(viewModel: CardViewModel) {
     val state = viewModel.uiState
     val context = LocalContext.current
     val pdfRendererService = remember { PdfRendererService() }
+    val editableSvgPackageService = remember { EditableSvgPackageService() }
 
     Scaffold(
         topBar = {
@@ -131,6 +133,18 @@ fun QR2CardApp(viewModel: CardViewModel) {
                             null
                         }
                     },
+                    onGenerateEditableSvg = {
+                        val data = viewModel.validateForExport()
+                        if (data != null) {
+                            runCatching {
+                                editableSvgPackageService.generateEditablePackage(context, data, state.templateConfig)
+                            }.onSuccess { viewModel.setLastExport(it) }
+                                .onFailure { viewModel.setStatus("SVG export failed: ${it.message}") }
+                                .getOrNull()
+                        } else {
+                            null
+                        }
+                    },
                     onShare = {
                         state.lastExport?.let { file ->
                             ShareUtils.shareFile(context, file, exportMimeType(file))
@@ -158,6 +172,9 @@ private fun screenTitle(screen: AppScreen): String = when (screen) {
 private fun exportMimeType(file: java.io.File): String = when (file.extension.lowercase(Locale.US)) {
     "png" -> "image/png"
     "pdf" -> "application/pdf"
+    // Correct SVG type so the receiving app keeps the ".svg" name. octet-stream made
+    // receivers drop the extension and rename the attachment.
+    "svg" -> "image/svg+xml"
     "zip" -> "application/zip"
     else -> "application/octet-stream"
 }
@@ -192,6 +209,7 @@ private fun SingleCardScreen(
     viewModel: CardViewModel,
     onGeneratePreview: () -> java.io.File?,
     onGeneratePrint: () -> java.io.File?,
+    onGenerateEditableSvg: () -> java.io.File?,
     onShare: () -> Unit,
 ) {
     val data = state.cardData
@@ -223,6 +241,9 @@ private fun SingleCardScreen(
     val savePngLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("image/png"),
     ) { uri -> finishSave(uri) }
+    val saveZipLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri -> finishSave(uri) }
 
     fun shareExport(file: java.io.File?) {
         file?.let { ShareUtils.shareFile(context, it, exportMimeType(it)) }
@@ -231,10 +252,10 @@ private fun SingleCardScreen(
     fun saveExport(file: java.io.File?) {
         file?.let {
             pendingSaveFile = it
-            if (it.extension.equals("png", ignoreCase = true)) {
-                savePngLauncher.launch(it.name)
-            } else {
-                savePdfLauncher.launch(it.name)
+            when (it.extension.lowercase(Locale.US)) {
+                "png" -> savePngLauncher.launch(it.name)
+                "zip" -> saveZipLauncher.launch(it.name)
+                else -> savePdfLauncher.launch(it.name)
             }
         }
     }
@@ -267,16 +288,16 @@ private fun SingleCardScreen(
         Field("Last Name", data.lastName) { value -> viewModel.updateCardData { it.copy(lastName = value) } }
         Field("Title", data.title) { value -> viewModel.updateCardData { it.copy(title = value) } }
         Field("Department (optional)", data.department) { value -> viewModel.updateCardData { it.copy(department = value) } }
-        Field("Mobile Country", data.mobileCountryIso) { value -> viewModel.updateCardData { it.copy(mobileCountryIso = value.uppercase()) } }
+        Field("Mobile Country (ISO, or use + prefix)", data.mobileCountryIso) { value -> viewModel.updateCardData { it.copy(mobileCountryIso = value.uppercase()) } }
         Field(
-            label = "Mobile Number",
+            label = "Mobile Number (any country; e.g. +55 11 98765-4321)",
             value = data.mobileRawInput,
             keyboardType = KeyboardType.Phone,
             onValueChange = { value -> viewModel.updateCardData { it.copy(mobileRawInput = value) } },
         )
         Field("Mobile Country 2 (optional)", data.mobile2CountryIso) { value -> viewModel.updateCardData { it.copy(mobile2CountryIso = value.uppercase()) } }
         Field(
-            label = "Mobile Number 2 (optional, China)",
+            label = "Mobile Number 2 (optional, any country)",
             value = data.mobile2RawInput,
             keyboardType = KeyboardType.Phone,
             onValueChange = { value -> viewModel.updateCardData { it.copy(mobile2RawInput = value) } },
@@ -317,6 +338,16 @@ private fun SingleCardScreen(
         OutlinedButton(onClick = { saveExport(onGeneratePrint()) }, modifier = Modifier.fillMaxWidth()) {
             Text("Print PDF - Save to...")
         }
+        Button(onClick = { shareExport(onGenerateEditableSvg()) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Editable SVG (ZIP) - Share...")
+        }
+        OutlinedButton(onClick = { saveExport(onGenerateEditableSvg()) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Editable SVG (ZIP) - Save to...")
+        }
+        Text(
+            "Editable SVG, zipped so it shares through apps that block raw .svg (e.g. WeChat). Unzip to one Illustrator file: front and back card, vector text and QR, embedded logo. Fonts included.",
+            style = MaterialTheme.typography.bodySmall,
+        )
         state.lastExport?.let { file ->
             OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth()) {
                 Text("Share Last Export Again")
@@ -459,6 +490,7 @@ private fun SettingsScreen(state: CardUiState, viewModel: CardViewModel) {
         Text("Export Options", fontWeight = FontWeight.Bold)
         Text("Preview PNG: one image containing front and back card artwork")
         Text("Print PDF: 4 pages, 98 mm x 62 mm with 3 mm bleed and crop marks")
+        Text("Editable SVG Package: Illustrator-editable text and vector QR; logo/watermark embedded in each page")
         Text("Pages 3-4 contain Chinese print-detail notes.")
         Text("Template version: V1 JSON")
     }

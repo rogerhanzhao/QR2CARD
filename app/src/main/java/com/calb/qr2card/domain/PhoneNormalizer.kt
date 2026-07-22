@@ -8,39 +8,54 @@ data class PhoneNormalizationResult(
     val isValid: Boolean,
     val display: String = "",
     val e164: String = "",
+    /** ISO country resolved from the number itself (e.g. "BR"), used for the (XX) card suffix. */
+    val regionIso: String = "",
     val error: String? = null,
 )
 
 class PhoneNormalizer(
     private val phoneUtil: PhoneNumberUtil = PhoneNumberUtil.getInstance(),
 ) {
+    /**
+     * Normalizes a mobile number without tying it to one nationality.
+     *
+     * A leading "+" carries its own country code, so any country's number (Brazil, etc.)
+     * parses regardless of [countryIso]; without "+", [countryIso] supplies the country.
+     * Acceptance uses `isPossibleNumber` rather than the strict `isValidNumber`, and even an
+     * unrecognised-but-non-blank number is kept as-is, so a valid contact is never blocked
+     * from export just because it does not match one country's rules.
+     */
     fun normalize(rawInput: String, countryIso: String): PhoneNormalizationResult {
-        val region = countryIso.trim().uppercase(Locale.US)
-        if (rawInput.isBlank()) {
+        val trimmed = rawInput.trim()
+        if (trimmed.isBlank()) {
             return PhoneNormalizationResult(false, error = "Mobile number is required.")
         }
-        if (region.length != 2) {
-            return PhoneNormalizationResult(false, error = "Mobile country must be a 2-letter ISO code.")
-        }
+        val hintRegion = countryIso.trim().uppercase(Locale.US).takeIf { it.length == 2 }
 
         return try {
-            val parsed = phoneUtil.parse(rawInput, region)
-            val isValid = phoneUtil.isValidNumber(parsed)
-            if (!isValid) {
-                PhoneNormalizationResult(false, error = "Mobile number is invalid for $region.")
-            } else {
-                val e164 = phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164)
+            val parsed = phoneUtil.parse(trimmed, hintRegion)
+            val resolvedRegion = phoneUtil.getRegionCodeForNumber(parsed)
+                ?.takeIf { it.isNotBlank() && it != "ZZ" }
+                ?: hintRegion.orEmpty()
+            if (phoneUtil.isPossibleNumber(parsed)) {
+                val display = if (resolvedRegion == "US") {
+                    "+${parsed.countryCode} ${phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.NATIONAL)}"
+                } else {
+                    phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.INTERNATIONAL)
+                }
                 PhoneNormalizationResult(
                     isValid = true,
-                    display = when (region) {
-                        "US" -> "+${parsed.countryCode} ${phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.NATIONAL)}"
-                        else -> phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.INTERNATIONAL)
-                    },
-                    e164 = e164,
+                    display = display,
+                    e164 = phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164),
+                    regionIso = resolvedRegion,
                 )
+            } else {
+                // Parsed but implausible length: keep the typed value rather than block export.
+                PhoneNormalizationResult(true, display = trimmed, e164 = trimmed, regionIso = resolvedRegion)
             }
         } catch (error: NumberParseException) {
-            PhoneNormalizationResult(false, error = error.message ?: "Mobile number cannot be parsed.")
+            // Unparseable but present: accept as typed so the card and QR still generate.
+            PhoneNormalizationResult(true, display = trimmed, e164 = trimmed, regionIso = hintRegion.orEmpty())
         }
     }
 }
